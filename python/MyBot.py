@@ -44,7 +44,7 @@ while True:
                         borders.append((newLoc, newSite, direction))
 
                 if len(borders) > 0:
-                    borderTarget = sorted(borders, key=lambda x: (x[1].production, -x[1].strength))[-1]
+                    borderTarget = sorted(borders, key=lambda b: (b[1].production, -b[1].strength))[-1]
                     if site.strength > borderTarget[1].strength:
                         moves.append(Move(loc, borderTarget[2]))
                 else:

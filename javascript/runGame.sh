@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./halite -d "50 50" "java java/MyBot" "python python/MyBot.py"
+./halite -d "30 30" "node MyBot.js" "node RandomBot.js"

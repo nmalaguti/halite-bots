@@ -1,0 +1,15 @@
+plugins {
+    id 'java'
+    id 'nebula.kotlin' version '1.0.5'
+    id 'application'
+    id 'idea'
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+}
+
+mainClassName = 'com.nmalaguti.halite.KotlinBot'
