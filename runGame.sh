@@ -11,4 +11,8 @@ rm -f *.log *.hlt
     ./gradlew installDist
 )
 
-./halite -d "50 50" -s 2773619301 "java -cp ./java MyBot" "python hacked-javascript/MyBot.py" "python kotlin/build/install/MyBot/MyBot.py"
+./halite -d "50 50" \
+    "java -cp ./stable/javabot MyBot" \
+    "python stable/jsbot/MyBot.py" \
+    "python stable/kotlinbot/MyBot.py" \
+    "python kotlin/build/install/MyBot/MyBot.py"
