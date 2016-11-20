@@ -15,4 +15,4 @@ rm -f *.log *.hlt
     "java -cp ./stable/javabot MyBot" \
     "python stable/jsbot/MyBot.py" \
     "python stable/kotlinbot/MyBot.py" \
-    "python kotlin/build/install/MyBot/MyBot.py"
+    "java -jar kotlin/build/install/MyBot/MyBot.jar"
