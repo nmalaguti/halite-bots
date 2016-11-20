@@ -34,7 +34,7 @@ public class Networking {
 
     static String serializeMoveList(List<Move> moves) {
         StringBuilder builder = new StringBuilder();
-        for(Move move : moves) builder.append(move.loc.getX() + " " + move.loc.getY() + " " + move.dir.ordinal() + " ");
+        for(Move move : moves) builder.append(move.getLoc().getX() + " " + move.getLoc().getY() + " " + move.getDir().ordinal() + " ");
         return builder.toString();
     }
 
@@ -52,7 +52,7 @@ public class Networking {
             owner = Integer.parseInt(inputStringComponents[currentIndex + 1]);
             currentIndex += 2;
             for(int a = 0; a < counter; ++a) {
-                map.contents.get(y).get(x).owner = owner;
+                map.contents.get(y).get(x).setOwner(owner);
                 ++x;
                 if(x == map.width) {
                     x = 0;
@@ -65,8 +65,8 @@ public class Networking {
             for (int b = 0; b < map.contents.get(a).size(); ++b) {
                 int strengthInt = Integer.parseInt(inputStringComponents[currentIndex]);
                 currentIndex++;
-                map.contents.get(a).get(b).strength = strengthInt;
-                map.contents.get(a).get(b).production = _productions.get(a).get(b);
+                map.contents.get(a).get(b).setStrength(strengthInt);
+                map.contents.get(a).get(b).setProduction(_productions.get(a).get(b));
             }
         }
 
@@ -98,11 +98,13 @@ public class Networking {
     }
 
     static InitPackage getInit() {
-        InitPackage initPackage = new InitPackage();
-        initPackage.myID = (int)Integer.parseInt(getString());
+
+        int myID = Integer.parseInt(getString());
         deserializeGameMapSize(getString());
         deserializeProductions(getString());
-        initPackage.map = deserializeGameMap(getString());
+        GameMap gameMap = deserializeGameMap(getString());
+
+        InitPackage initPackage = new InitPackage(myID, gameMap);
 
         return initPackage;
     }

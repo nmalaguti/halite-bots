@@ -9,17 +9,17 @@ public class GameMap{
     public GameMap() {
         width = 0;
         height = 0;
-        contents = new ArrayList< ArrayList<Site> >(0);
+        contents = new ArrayList<>(0);
     }
 
     public GameMap(int width_, int height_) {
         width = width_;
         height = height_;
-        contents = new ArrayList< ArrayList<Site> >(0);
+        contents = new ArrayList<>(0);
         for(int y = 0; y < height; y++) {
-            ArrayList<Site> row = new ArrayList<Site>();
+            ArrayList<Site> row = new ArrayList<>();
             for(int x = 0; x < width; x++) {
-                row.add(new Site());
+                row.add(new Site(0, 0, 0, new Location(x, y)));
             }
             contents.add(row);
         }
