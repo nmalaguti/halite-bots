@@ -2,6 +2,7 @@
 *.hlt
 *.log
 *.zip
+*.lck
 
 # Created by https://www.gitignore.io/api/node
 
