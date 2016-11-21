@@ -1,6 +1,6 @@
 package com.nmalaguti.halite
 
-val BOT_NAME = "MyBattleBot"
+val BOT_NAME = "MySmarterBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -29,14 +29,17 @@ object MyBot {
     }
 
     fun endGameLoop() {
+        removeRepeatMoves()
+
+        Networking.sendFrame(allMoves)
+    }
+
+    fun removeRepeatMoves() {
         // audit all moves to prevent repeated swapping
         allMoves.removeAll {
             val moveFromDestination = lastTurnMoves[it.loc.move(it.dir)]
             moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == it.loc
         }
-
-        logger.info("${allMoves}")
-        Networking.sendFrame(allMoves)
     }
 
     fun shortCircuit() = if (System.currentTimeMillis() - start > MAXIMUM_TIME) {
@@ -71,6 +74,7 @@ object MyBot {
             allMoves.addAll(makeValueMoves())
 
             if (shortCircuit()) continue
+            removeRepeatMoves()
             updateMovedIndex()
 
             innerBorderCells = points.filter { it.isInnerBorder() }
@@ -79,12 +83,14 @@ object MyBot {
             allMoves.addAll(makeJointMoves())
 
             if (shortCircuit()) continue
+            removeRepeatMoves()
             updateMovedIndex()
 
             // make moves that abandon cells that will take too long to conquer
             allMoves.addAll(makeAbandonMoves())
 
             if (shortCircuit()) continue
+            removeRepeatMoves()
             updateMovedIndex()
 
             // find a friendly unit and help out
@@ -207,7 +213,7 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.value(origin: Location): Double {
-        if (this.isEnvironment()) {
+        if (this.isEnvironment() && this.strength > 0) {
             return this.strength / Math.pow(this.production.toDouble(), 2.0)
         } else {
             // overkill
@@ -273,8 +279,7 @@ object MyBot {
 
     // CLASSES
 
-    class RelativeLocation(val origin: Location,
-                                val direction: Direction) {
+    class RelativeLocation(val origin: Location, val direction: Direction) {
         val loc: Location = origin.move(direction)
     }
 
