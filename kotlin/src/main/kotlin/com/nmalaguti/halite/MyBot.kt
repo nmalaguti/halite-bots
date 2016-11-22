@@ -29,16 +29,24 @@ object MyBot {
     }
 
     fun endGameLoop() {
-        removeRepeatMoves()
+        removeUnwiseMoves()
 
         Networking.sendFrame(allMoves)
     }
 
-    fun removeRepeatMoves() {
+    fun removeUnwiseMoves() {
         // audit all moves to prevent repeated swapping
         allMoves.removeAll {
             val moveFromDestination = lastTurnMoves[it.loc.move(it.dir)]
             moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == it.loc
+        }
+
+        // remove moves that attack other players with too little strength
+        allMoves.removeAll {
+            val destination = it.loc.move(it.dir)
+
+            destination.site().isEnvironment() && destination.site().strength == 0 &&
+                    it.loc.site().strength <  Math.min(it.loc.site().production * 2, MINIMUM_STRENGTH)
         }
     }
 
@@ -74,7 +82,7 @@ object MyBot {
             allMoves.addAll(makeValueMoves())
 
             if (shortCircuit()) continue
-            removeRepeatMoves()
+            removeUnwiseMoves()
             updateMovedIndex()
 
             innerBorderCells = points.filter { it.isInnerBorder() }
@@ -83,14 +91,14 @@ object MyBot {
             allMoves.addAll(makeJointMoves())
 
             if (shortCircuit()) continue
-            removeRepeatMoves()
+            removeUnwiseMoves()
             updateMovedIndex()
 
             // make moves that abandon cells that will take too long to conquer
             allMoves.addAll(makeAbandonMoves())
 
             if (shortCircuit()) continue
-            removeRepeatMoves()
+            removeUnwiseMoves()
             updateMovedIndex()
 
             // find a friendly unit and help out
@@ -115,7 +123,8 @@ object MyBot {
                             val best = targets.sortedBy { it.loc.site().value(it.origin) }.first()
                             Move(best.origin, best.direction)
                         } else null
-                    } else if (loc.site().strength > MINIMUM_STRENGTH && loc !in lastTurnMoves) {
+                    } else if (loc.site().strength > Math.min(loc.site().production * 4, MINIMUM_STRENGTH * 3 + 1)
+                            && loc !in lastTurnMoves) {
                         val best = loc.allNeighborsWithin(7)
                                 .filterNot { it.site().isMine() }
                                 .sortedBy { it.site().value(loc) }
@@ -214,7 +223,7 @@ object MyBot {
 
     fun Site.value(origin: Location): Double {
         if (this.isEnvironment() && this.strength > 0) {
-            return this.strength / Math.pow(this.production.toDouble(), 2.0)
+            return (this.strength + origin.site().production) / Math.pow(this.production.toDouble(), 2.0)
         } else {
             // overkill
             val strength = origin.site().strength
@@ -226,7 +235,7 @@ object MyBot {
                     Math.min(this.strength, strength) + this.production
 
 
-            return -damage.toDouble()
+            return -damage.toDouble() - strength
         }
     }
 
