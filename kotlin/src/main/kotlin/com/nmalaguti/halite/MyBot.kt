@@ -340,4 +340,126 @@ object MyBot {
             Move(start, Direction.NORTH)
         }
     }
+
+    fun pathTowards(start: Location, end: Location): Move? {
+        val path = astar(start, end)
+        if (path != null && path.size > 1) {
+            return moveTowards(start, path.take(2).last())
+        }
+        return null
+    }
+
+    /**
+     * function A*(start, goal)
+     *     // The set of nodes already evaluated.
+     *     closedSet := {}
+     *     // The set of currently discovered nodes still to be evaluated.
+     *     // Initially, only the start node is known.
+     *     openSet := {start}
+     *     // For each node, which node it can most efficiently be reached from.
+     *     // If a node can be reached from many nodes, cameFrom will eventually contain the
+     *     // most efficient previous step.
+     *     cameFrom := the empty map
+     *
+     *     // For each node, the cost of getting from the start node to that node.
+     *     gScore := map with default value of Infinity
+     *     // The cost of going from start to start is zero.
+     *     gScore[start] := 0
+     *     // For each node, the total cost of getting from the start node to the goal
+     *     // by passing by that node. That value is partly known, partly heuristic.
+     *     fScore := map with default value of Infinity
+     *     // For the first node, that value is completely heuristic.
+     *     fScore[start] := heuristic_cost_estimate(start, goal)
+     *
+     *     while openSet is not empty
+     *         current := the node in openSet having the lowest fScore[] value
+     *         if current = goal
+     *             return reconstruct_path(cameFrom, current)
+     *
+     *         openSet.Remove(current)
+     *         closedSet.Add(current)
+     *         for each neighbor of current
+     *             if neighbor in closedSet
+     *                 continue		// Ignore the neighbor which is already evaluated.
+     *             // The distance from start to a neighbor
+     *             tentative_gScore := gScore[current] + dist_between(current, neighbor)
+     *             if neighbor not in openSet	// Discover a new node
+     *                 openSet.Add(neighbor)
+     *             else if tentative_gScore >= gScore[neighbor]
+     *                 continue		// This is not a better path.
+     *
+     *             // This path is the best until now. Record it!
+     *             cameFrom[neighbor] := current
+     *             gScore[neighbor] := tentative_gScore
+     *             fScore[neighbor] := gScore[neighbor] + heuristic_cost_estimate(neighbor, goal)
+     *
+     *     return failure
+     *
+     * function reconstruct_path(cameFrom, current)
+     *     total_path := [current]
+     *     while current in cameFrom.Keys:
+     *         current := cameFrom[current]
+     *         total_path.append(current)
+     *     return total_path
+     */
+
+    val INFINITY: Int = Int.MAX_VALUE / 2
+
+    fun Location.cost() = if (this.site().isMine())
+        this.site().production * this.site().production
+    else this.site().strength
+
+    fun List<Location>.cost() = this.sumBy { it.cost() }
+
+    fun astar(start: Location, goal: Location): List<Location>? {
+        val closedSet = mutableSetOf<Location>()
+
+        val openSet = mutableSetOf(start)
+
+        val cameFrom = mutableMapOf<Location, Location>()
+
+        val gScore = mutableMapOf(start to 0)
+        val fScore = mutableMapOf(start to 0)
+
+        while (openSet.isNotEmpty()) {
+            val current = openSet.minBy { fScore.getOrElse(it, { INFINITY }) }!!
+
+            if (current == goal) {
+                return reconstructPath(cameFrom, current)
+            }
+
+            openSet.remove(current)
+            closedSet.add(current)
+
+            for (neighbor in current.neighbors()) {
+                if (neighbor.loc in closedSet) {
+                    continue
+                }
+
+                val tentativeGScore = gScore.getOrElse(current, { INFINITY }) + neighbor.loc.cost()
+                if (neighbor.loc !in openSet) {
+                    openSet.add(neighbor.loc)
+                } else if (tentativeGScore >= gScore.getOrElse(neighbor.loc, { INFINITY })) {
+                    continue
+                }
+
+                cameFrom[neighbor.loc] = current
+                gScore[neighbor.loc] = tentativeGScore
+                fScore[neighbor.loc] = gScore.getOrElse(neighbor.loc, { INFINITY }) +
+                        (gameMap.getDistance(neighbor.loc, goal).toInt() * averageCost)
+            }
+        }
+
+        return null
+    }
+
+    fun reconstructPath(cameFrom: Map<Location, Location>, current: Location): List<Location> {
+        var cur = current
+        val totalPath = mutableListOf(cur)
+        while (cur in cameFrom) {
+            cur = cameFrom[cur]!!
+            totalPath.add(cur)
+        }
+        return totalPath.reversed()
+    }
 }
