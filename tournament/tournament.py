@@ -1,4 +1,4 @@
-from trueskill import Rating, rate
+from trueskill import Rating, rate, rate_1vs1
 from json import load, dump
 from subprocess import run, PIPE
 from os import listdir, remove
@@ -21,24 +21,71 @@ def parse_result(result, numbots):
     return hlt_file, seed, ranking
 
 
-def run_halite(commands, dimension):
-    completed_process = run([HALITE, '-q', '-d', '%s %s' % (dimension, dimension), *commands], stdout=PIPE, universal_newlines=True)
+def run_halite(commands, dimension, seed=None):
+    seedargs = []
+    if seed:
+        seedargs = ['-s', seed]
+    completed_process = run([HALITE, '-q', '-d', '%s %s' % (dimension, dimension), *seedargs, *commands], stdout=PIPE, universal_newlines=True)
     hlt_file, seed, ranking = parse_result(completed_process.stdout, len(commands))
     remove(hlt_file)
 
     for log in glob('*.log*'):
         remove(log)
 
-    return ranking
+    return seed, ranking
 
 
 def run_match():
-    population = listdir('bots')
+    population = listdir('bots/enabled')
     bots = sample(population, randint(2, min(len(population), 6)))
 
-    commands = ['bots/%s/run.sh' % bot for bot in bots]
-    ranking = run_halite(commands, choice(MAP_SIZES))
+    commands = ['bots/enabled/%s/run.sh' % bot for bot in bots]
+    seed, ranking = run_halite(commands, choice(MAP_SIZES))
 
+    update_ratings(bots, ranking)
+
+    write_db()
+    pprint(db)
+
+
+def run_1v1():
+    bots = ['savvybot', 'smarterbot']
+
+    ratings = []
+    for bot in bots:
+        try:
+            rating = Rating(db[bot]['mu'], db[bot]['sigma'])
+        except KeyError:
+            rating = Rating()
+            db[bot] = {
+                'mu': rating.mu,
+                'sigma': rating.sigma,
+            }
+
+        ratings.append(rating)
+
+    commands = ['bots/%s/run.sh' % bot for bot in bots]
+    map_size = choice(MAP_SIZES)
+    seed, ranking1 = run_halite(commands, map_size)
+
+    seed, ranking2 = run_halite(list(reversed(commands)), map_size, seed=seed)
+
+    if ranking1[0] == ranking2[0]:
+        updated = rate_1vs1(ratings[0], ratings[1], drawn=True)
+    elif ranking1[0] == 1:
+        updated = rate_1vs1(ratings[0], ratings[1])
+    else:
+        updated = rate_1vs1(ratings[1], ratings[0])
+
+    for bot, rating in zip(bots, updated):
+        db[bot]['mu'] = rating.mu
+        db[bot]['sigma'] = rating.sigma
+
+    write_db()
+    pprint(db)
+
+
+def update_ratings(bots, ranking):
     ratings = []
     for bot in bots:
         try:
@@ -57,9 +104,6 @@ def run_match():
     for bot, rating in zip(bots, updated):
         db[bot]['mu'] = rating[0].mu
         db[bot]['sigma'] = rating[0].sigma
-
-    write_db()
-    pprint(db)
 
 
 def write_db():
