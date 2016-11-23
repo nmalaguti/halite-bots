@@ -1,6 +1,7 @@
 package com.nmalaguti.halite;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public class Networking {
@@ -32,7 +33,7 @@ public class Networking {
         }
     }
 
-    static String serializeMoveList(List<Move> moves) {
+    static String serializeMoveList(Collection<Move> moves) {
         StringBuilder builder = new StringBuilder();
         for(Move move : moves) builder.append(move.getLoc().getX() + " " + move.getLoc().getY() + " " + move.getDir().ordinal() + " ");
         return builder.toString();
@@ -117,7 +118,7 @@ public class Networking {
         return deserializeGameMap(getString());
     }
 
-    static void sendFrame(List<Move> moves) {
+    static void sendFrame(Collection<Move> moves) {
         sendString(serializeMoveList(moves));
     }
 

@@ -1,6 +1,6 @@
 package com.nmalaguti.halite
 
-val BOT_NAME = "MySmarterBot"
+val BOT_NAME = "MySavvyBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -10,12 +10,13 @@ object MyBot {
     var id: Int = 0
     var turn: Int = 0
     lateinit var points: List<Location>
-    var allMoves = mutableListOf<Move>()
+    var allMoves = mutableSetOf<Move>()
     var start = System.currentTimeMillis()
     var movedLocations = setOf<Location>()
     var innerBorderCells: List<Location> = listOf()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
+    var averageCost = 1
 
     fun init() {
         val init = Networking.getInit()
@@ -48,6 +49,26 @@ object MyBot {
             destination.site().isEnvironment() && destination.site().strength == 0 &&
                     it.loc.site().strength <  Math.min(it.loc.site().production * 2, MINIMUM_STRENGTH)
         }
+
+        val movesByDest = allMoves
+                .groupBy { it.loc.move(it.dir) }
+
+        movesByDest.filter {
+            if (it.key !in movesByDest) it.value.sumBy { it.loc.site().strength } > 255
+            else it.value.sumBy { it.loc.site().strength } > 255 + it.key.site().strength
+        }.forEach {
+            val values = it.value.toMutableSet()
+            while (it.key.site().strength + values.sumBy { it.loc.site().strength } > 255) {
+                val toRemove = values.filter { it.loc !in movesByDest }.firstOrNull()
+                if (toRemove != null) {
+                    values.remove(toRemove)
+                    allMoves.remove(toRemove)
+                } else {
+                    allMoves.remove(values.first())
+                    values.remove(values.first())
+                }
+            }
+        }
     }
 
     fun shortCircuit() = if (System.currentTimeMillis() - start > MAXIMUM_TIME) {
@@ -68,15 +89,19 @@ object MyBot {
         while (true) {
             // get frame
             gameMap = Networking.getFrame()
-            playerStats = playerStats()
 
             start = System.currentTimeMillis()
             logger.info("===== Turn: ${turn++} at $start =====")
 
             lastTurnMoves = allMoves.associateBy { it.loc }
+            playerStats = playerStats()
+            averageCost = points
+                    .map { it.cost() }
+                    .average()
+                    .toInt()
 
             // reset all moves
-            allMoves = mutableListOf()
+            allMoves = mutableSetOf()
 
             // make moves based on value
             allMoves.addAll(makeValueMoves())
