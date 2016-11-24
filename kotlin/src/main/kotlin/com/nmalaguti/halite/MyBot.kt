@@ -1,6 +1,6 @@
 package com.nmalaguti.halite
 
-val BOT_NAME = "MySavvyBot"
+val BOT_NAME = "MyFrugalBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -32,6 +32,109 @@ object MyBot {
     fun endGameLoop() {
         removeUnwiseMoves()
 
+        // deal with combining cells to strength over 255
+        val newMap = simulateNextFrame(allMoves, gameMap)
+        val wastage = permutations(newMap).filter { newMap.getSite(it).owner == id && newMap.getSite(it).strength > 255 }.toSet()
+
+        wastage.forEach {
+            logger.info("wastage of ${newMap.getSite(it).strength} at $it")
+        }
+
+        val movesByDest = allMoves
+                .groupBy { it.loc.move(it.dir) }
+
+        wastage.filter { newMap.getSite(it).strength > 300 }.forEach { loc ->
+            // is destination staying still and causing problems?
+            // - either production + strength > 255
+            // are too many pieces moving there
+            val incoming = movesByDest[loc]
+            val site = newMap.getSite(loc)
+            if (incoming != null) {
+                val possibleDirections = Direction.CARDINALS.filter { newMap.getSite(loc, it).strength + site.strength <= 255 }
+                val incomingStrength = incoming.sumBy { it.loc.site().strength }
+                if (loc !in movedLocations && incomingStrength <= 255 && possibleDirections.isNotEmpty()) {
+                    // move out of the way
+                    allMoves.add(Move(loc, possibleDirections.first()))
+                } else if (loc !in movedLocations && incomingStrength <= 255) {
+                    // can't move out of the way
+                    // can we send in less strength?
+                    if (incoming.any { site.strength + it.loc.site().strength <= 255 }) {
+                        var left = incoming.sumBy { it.loc.site().strength } + site.strength
+                        val sorted = incoming.sortedBy { it.loc.site().strength }.toMutableList()
+                        val toChange = mutableListOf<Move>()
+                        while (left > 255 && sorted.isNotEmpty()) {
+                            val next = sorted.removeAt(0)
+                            left -= next.loc.site().strength
+                            toChange.add(next)
+                        }
+
+                        // can we change some of these moves?
+                        toChange.forEach { changeMe ->
+                            allMoves.remove(changeMe)
+
+                            val morePossibleDirections = Direction.CARDINALS
+                                    .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
+
+                            if (morePossibleDirections.isNotEmpty()) {
+                                allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
+                            } else {
+                                allMoves.add(Move(changeMe.loc, Direction.STILL))
+                            }
+                        }
+                    } else {
+                        // nope - all or nothing
+                        incoming.forEach { changeMe ->
+                            allMoves.remove(changeMe)
+
+                            val morePossibleDirections = Direction.CARDINALS
+                                    .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
+
+                            if (morePossibleDirections.isNotEmpty()) {
+                                allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
+                            } else {
+                                allMoves.add(Move(changeMe.loc, Direction.STILL))
+                            }
+                        }
+                    }
+                } else {
+                    var left = incoming.sumBy { it.loc.site().strength }
+                    val sorted = incoming.sortedBy { it.loc.site().strength }.toMutableList()
+                    val toChange = mutableListOf<Move>()
+                    while (left > 255 && sorted.isNotEmpty()) {
+                        val next = sorted.removeAt(0)
+                        left -= next.loc.site().strength
+                        toChange.add(next)
+                    }
+
+                    // can we change some of these moves?
+                    toChange.forEach { changeMe ->
+                        allMoves.remove(changeMe)
+
+                        val morePossibleDirections = Direction.CARDINALS
+                                .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
+
+                        if (morePossibleDirections.isNotEmpty()) {
+                            allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
+                        } else {
+                            allMoves.add(Move(changeMe.loc, Direction.STILL))
+                        }
+                    }
+                }
+            } else {
+                // staying still is causing it to go over
+//                val possibleDirections = Direction.CARDINALS
+//                        .sortedBy { newMap.getSite(loc, it).strength + loc.site().strength <= 255 }
+//                allMoves.add(Move(loc, possibleDirections.first()))
+            }
+        }
+
+        val newNewMap = simulateNextFrame(allMoves, gameMap)
+        val newWastage = permutations(newMap).filter { newNewMap.getSite(it).owner == id && newNewMap.getSite(it).strength > 255 }.toSet()
+
+        newWastage.forEach {
+            logger.info("still wastage of ${newNewMap.getSite(it).strength} at $it")
+        }
+
         Networking.sendFrame(allMoves)
     }
 
@@ -48,26 +151,6 @@ object MyBot {
 
             destination.site().isEnvironment() && destination.site().strength == 0 &&
                     it.loc.site().strength <  Math.min(it.loc.site().production * 2, MINIMUM_STRENGTH)
-        }
-
-        val movesByDest = allMoves
-                .groupBy { it.loc.move(it.dir) }
-
-        movesByDest.filter {
-            if (it.key !in movesByDest) it.value.sumBy { it.loc.site().strength } > 255
-            else it.value.sumBy { it.loc.site().strength } > 255 + it.key.site().strength
-        }.forEach {
-            val values = it.value.toMutableSet()
-            while (it.key.site().strength + values.sumBy { it.loc.site().strength } > 255) {
-                val toRemove = values.filter { it.loc !in movesByDest }.firstOrNull()
-                if (toRemove != null) {
-                    values.remove(toRemove)
-                    allMoves.remove(toRemove)
-                } else {
-                    allMoves.remove(values.first())
-                    values.remove(values.first())
-                }
-            }
         }
     }
 
@@ -347,6 +430,45 @@ object MyBot {
             return moveTowards(start, path.take(2).last())
         }
         return null
+    }
+
+    fun simulateNextFrame(moves: Collection<Move>, map: GameMap): GameMap {
+        val newMap = GameMap(map)
+
+        val toUpdate = permutations(newMap).filter { newMap.getSite(it).owner == id }.toMutableSet()
+
+        moves.forEach {
+            if (it.loc in toUpdate) {
+                toUpdate.remove(it.loc)
+                val originSite = map.getSite(it.loc)
+                val startSite = newMap.getSite(it.loc)
+                val destinationSite = newMap.getSite(it.loc, it.dir)
+
+                if (startSite.owner == destinationSite.owner) {
+                    if (it.dir == Direction.STILL) {
+                        destinationSite.strength += destinationSite.production
+                    } else {
+                        startSite.strength -= originSite.strength
+                        destinationSite.strength += originSite.strength
+                    }
+                } else {
+                    startSite.strength -= originSite.strength
+                    if (destinationSite.strength <= originSite.strength) {
+                        destinationSite.strength = originSite.strength - destinationSite.strength
+                        destinationSite.owner = originSite.owner
+                    } else {
+                        destinationSite.strength -= originSite.strength
+                    }
+                }
+            }
+        }
+
+        toUpdate.forEach {
+            val destinationSite = newMap.getSite(it)
+            destinationSite.strength += destinationSite.production
+        }
+
+        return newMap
     }
 
     /**

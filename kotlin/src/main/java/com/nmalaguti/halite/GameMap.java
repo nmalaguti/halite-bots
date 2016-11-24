@@ -25,6 +25,19 @@ public class GameMap{
         }
     }
 
+    public GameMap(GameMap gameMap) {
+        width = gameMap.width;
+        height = gameMap.height;
+        contents = new ArrayList<>(0);
+        for (ArrayList<Site> row : gameMap.contents) {
+            ArrayList<Site> newRow = new ArrayList<>();
+            for (Site site : row) {
+                newRow.add(new Site(site.getStrength(), site.getProduction(), site.getOwner(), new Location(site.getLoc())));
+            }
+            contents.add(newRow);
+        }
+    }
+
     public boolean inBounds(Location loc) {
         return loc.getX() < width && loc.getX() >= 0 && loc.getY() < height && loc.getY() >= 0;
     }
