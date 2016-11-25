@@ -1,5 +1,6 @@
 package com.nmalaguti.halite
 
+import java.security.SecureRandom
 import kotlin.comparisons.compareBy
 
 val BOT_NAME = "MyExoticBot"
@@ -25,6 +26,8 @@ object MyBot {
         gameMap = init.gameMap
         id = init.myID
         points = permutations(gameMap)
+
+        points.forEach { pheromones.put(it, 0.0) }
 
         logger.info("id: $id")
 
@@ -52,6 +55,7 @@ object MyBot {
     }
 
     fun endGameLoop() {
+        log(allMoves)
         Networking.sendFrame(allMoves)
     }
 
@@ -72,8 +76,94 @@ object MyBot {
 
     // MOVE LOGIC
 
-    fun makeMoves() {
+    class Ant(var location: Location,
+              val path: MutableSet<Location> = mutableSetOf(),
+              var alive: Boolean = true,
+              var valueOfLastMove: Double = 0.0) {
 
+        fun merge(ant: Ant) {
+            path.addAll(ant.path)
+        }
+    }
+
+    var ants = mutableListOf<Ant>()
+    val pheromones = mutableMapOf<Location, Double>()
+
+    fun makeMoves() {
+        pheromones.forEach {
+            pheromones[it.key] = it.value / 10.0
+        }
+
+        val newAnts = mutableMapOf<Location, Ant>()
+
+        // merge ants from last generation
+        ants.groupBy { it.location }.mapValues {
+            if (it.key.site().isMine()) {
+                newAnts.put(it.key, it.value.fold(Ant(it.key), { acc, curr ->
+                    if (curr.alive) {
+                        acc.merge(curr)
+                    } else {
+                        // leave phermone on result
+                        curr.path.forEach {
+                            if (pheromones[it] != null) {
+                                pheromones[it] = ((pheromones[it] ?: 0.0) +
+                                        if (curr.valueOfLastMove < 0) -curr.valueOfLastMove
+                                        else 1 / curr.valueOfLastMove) / curr.path.size
+                            }
+                        }
+                    }
+
+                    acc
+                }))
+            }
+        }
+
+        ants = mutableListOf()
+
+        // new ants
+        points.filter { it.site().isMine() && it.site().strength > it.site().production * 5 && it !in newAnts }.forEach {
+            newAnts.put(it, Ant(it))
+        }
+
+        newAnts.forEach { entry ->
+            val ant = entry.value
+
+            if (ant.location.site().strength > ant.location.site().production * 5) {
+                // pick a direction!
+                val options = ant.location.neighbors()
+                        .filter {
+                            it.loc.site().isMine() ||
+                                    (!it.loc.site().isMine() && it.loc.site().strength < ant.location.site().strength)
+                        }
+//                        .filter { it.loc !in ant.path }
+                        .map { it.loc }
+
+                if (options.isNotEmpty()) {
+                    val choice = if (options.any { !it.site().isMine() }) {
+                        options.sortedBy { it.site().value(ant.location) }.first()
+                    } else {
+                        options.sortedBy { -pheromones.getOrElse(it, { 0.0 }) }.first()
+                    }
+
+
+                    if (!choice.site().isMine()) {
+                        ant.alive = false
+                        ant.valueOfLastMove = choice.site().value(ant.location)
+                    }
+
+                    allMoves.add(moveTowards(ant.location, choice))
+                    ant.path.add(ant.location)
+                    ant.location = choice
+                }
+            }
+
+            ants.add(ant)
+        }
+    }
+
+    fun <T> List<T>.randomChoice(): T {
+        val random = SecureRandom()
+        return this[random.nextInt(this.size)]
     }
 
     // EXTENSIONS METHODS
@@ -87,7 +177,9 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.value(origin: Location): Double {
-        if (this.isEnvironment() && this.strength > 0) {
+        if (this.isMine()) {
+            return 10000.0
+        } else if (this.isEnvironment() && this.strength > 0) {
             return (this.strength + origin.site().production) / Math.pow(this.production.toDouble(), 2.0)
         } else {
             // overkill
