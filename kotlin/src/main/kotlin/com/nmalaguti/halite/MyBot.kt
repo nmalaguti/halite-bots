@@ -1,18 +1,19 @@
 package com.nmalaguti.halite
 
-val BOT_NAME = "MyFrugalBot"
-val MAXIMUM_TIME = 940 // ms
+val BOT_NAME = "MyTargetsBot"
+val MAXIMUM_TIME = 900 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
 
 object MyBot {
     lateinit var gameMap: GameMap
+    lateinit var nextMap: GameMap
     var id: Int = 0
     var turn: Int = 0
     lateinit var points: List<Location>
     var allMoves = mutableSetOf<Move>()
+    var allTargets = mutableMapOf<Location, Location>()
     var start = System.currentTimeMillis()
-    var movedLocations = setOf<Location>()
     var innerBorderCells: List<Location> = listOf()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
@@ -30,137 +31,90 @@ object MyBot {
     }
 
     fun endGameLoop() {
-        removeUnwiseMoves()
-
-        // deal with combining cells to strength over 255
-        val newMap = simulateNextFrame(allMoves, gameMap)
-        val wastage = permutations(newMap).filter { newMap.getSite(it).owner == id && newMap.getSite(it).strength > 255 }.toSet()
-
-        wastage.forEach {
-            logger.info("wastage of ${newMap.getSite(it).strength} at $it")
-        }
-
-        val movesByDest = allMoves
-                .groupBy { it.loc.move(it.dir) }
-
-        wastage.filter { newMap.getSite(it).strength > 300 }.forEach { loc ->
-            // is destination staying still and causing problems?
-            // - either production + strength > 255
-            // are too many pieces moving there
-            val incoming = movesByDest[loc]
-            val site = newMap.getSite(loc)
-            if (incoming != null) {
-                val possibleDirections = Direction.CARDINALS.filter { newMap.getSite(loc, it).strength + site.strength <= 255 }
-                val incomingStrength = incoming.sumBy { it.loc.site().strength }
-                if (loc !in movedLocations && incomingStrength <= 255 && possibleDirections.isNotEmpty()) {
-                    // move out of the way
-                    allMoves.add(Move(loc, possibleDirections.first()))
-                } else if (loc !in movedLocations && incomingStrength <= 255) {
-                    // can't move out of the way
-                    // can we send in less strength?
-                    if (incoming.any { site.strength + it.loc.site().strength <= 255 }) {
-                        var left = incoming.sumBy { it.loc.site().strength } + site.strength
-                        val sorted = incoming.sortedBy { it.loc.site().strength }.toMutableList()
-                        val toChange = mutableListOf<Move>()
-                        while (left > 255 && sorted.isNotEmpty()) {
-                            val next = sorted.removeAt(0)
-                            left -= next.loc.site().strength
-                            toChange.add(next)
-                        }
-
-                        // can we change some of these moves?
-                        toChange.forEach { changeMe ->
-                            allMoves.remove(changeMe)
-
-                            val morePossibleDirections = Direction.CARDINALS
-                                    .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
-
-                            if (morePossibleDirections.isNotEmpty()) {
-                                allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
-                            } else {
-                                allMoves.add(Move(changeMe.loc, Direction.STILL))
-                            }
-                        }
-                    } else {
-                        // nope - all or nothing
-                        incoming.forEach { changeMe ->
-                            allMoves.remove(changeMe)
-
-                            val morePossibleDirections = Direction.CARDINALS
-                                    .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
-
-                            if (morePossibleDirections.isNotEmpty()) {
-                                allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
-                            } else {
-                                allMoves.add(Move(changeMe.loc, Direction.STILL))
-                            }
-                        }
-                    }
-                } else {
-                    var left = incoming.sumBy { it.loc.site().strength }
-                    val sorted = incoming.sortedBy { it.loc.site().strength }.toMutableList()
-                    val toChange = mutableListOf<Move>()
-                    while (left > 255 && sorted.isNotEmpty()) {
-                        val next = sorted.removeAt(0)
-                        left -= next.loc.site().strength
-                        toChange.add(next)
-                    }
-
-                    // can we change some of these moves?
-                    toChange.forEach { changeMe ->
-                        allMoves.remove(changeMe)
-
-                        val morePossibleDirections = Direction.CARDINALS
-                                .filter { newMap.getSite(changeMe.loc, it).strength + changeMe.loc.site().strength <= 255 }
-
-                        if (morePossibleDirections.isNotEmpty()) {
-                            allMoves.add(Move(changeMe.loc, morePossibleDirections.first()))
-                        } else {
-                            allMoves.add(Move(changeMe.loc, Direction.STILL))
-                        }
-                    }
-                }
-            } else {
-                // staying still is causing it to go over
-//                val possibleDirections = Direction.CARDINALS
-//                        .sortedBy { newMap.getSite(loc, it).strength + loc.site().strength <= 255 }
-//                allMoves.add(Move(loc, possibleDirections.first()))
-            }
-        }
-
-        val newNewMap = simulateNextFrame(allMoves, gameMap)
-        val newWastage = permutations(newMap).filter { newNewMap.getSite(it).owner == id && newNewMap.getSite(it).strength > 255 }.toSet()
-
-        newWastage.forEach {
-            logger.info("still wastage of ${newNewMap.getSite(it).strength} at $it")
-        }
+        targetsToMoves()
 
         Networking.sendFrame(allMoves)
+        logger.info("total: ${System.currentTimeMillis() - start}ms")
     }
 
-    fun removeUnwiseMoves() {
-        // audit all moves to prevent repeated swapping
-        allMoves.removeAll {
-            val moveFromDestination = lastTurnMoves[it.loc.move(it.dir)]
-            moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == it.loc
+    fun targetsToMoves() {
+        val startTime = System.currentTimeMillis()
+        points.filter { it.site().isMine() }.toSet().minus(allTargets.keys).forEach {
+            val site = nextMap.getSite(it)
+            if (site.strength + site.production <= 255) site.strength += site.production
+            else site.strength = 255
         }
 
-        // remove moves that attack other players with too little strength
-        allMoves.removeAll {
-            val destination = it.loc.move(it.dir)
+        var prevSize = 0
 
-            destination.site().isEnvironment() && destination.site().strength == 0 &&
-                    it.loc.site().strength <  Math.min(it.loc.site().production * 2, MINIMUM_STRENGTH)
+        var numLoops = 0
+        var numPathed = 0
+
+        while (allTargets.isNotEmpty() && allTargets.size != prevSize) {
+            logger.info("alltargets size: ${allTargets.size}")
+            prevSize = allTargets.size
+            val destinationLookup = allTargets.map { moveTowards(it.key, it.value) }
+                    .filter { it.loc.move(it.dir) !in allTargets }
+                    .groupBy { it.loc.move(it.dir) }
+                    .forEach {
+                        if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
+                        it.value.forEach {
+                            allTargets.remove(it.loc)
+                            val nextSite = nextMap.getSite(it.loc.move(it.dir))
+
+                            val move = if (nextSite.strength + nextMap.getSite(it.loc).strength > 255) {
+                                numPathed++
+                                pathTowards(it.loc, it.loc.move(it.dir))
+                            } else it
+
+                            if (move != null) {
+                                // audit all moves to prevent repeated swapping
+                                val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
+                                if (moveFromDestination != null &&
+                                        moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
+                                    val site = nextMap.getSite(it.loc)
+                                    if (site.strength + site.production <= 255) site.strength += site.production
+                                    else site.strength = 255
+                                } else {
+                                    val originSite = gameMap.getSite(move.loc)
+                                    val startSite = nextMap.getSite(move.loc)
+                                    val destinationSite = nextMap.getSite(move.loc, move.dir)
+
+                                    if (startSite.owner == destinationSite.owner) {
+                                        if (move.dir == Direction.STILL) {
+                                            destinationSite.strength += destinationSite.production
+                                        } else {
+                                            startSite.strength -= originSite.strength
+                                            destinationSite.strength += originSite.strength
+                                        }
+                                    } else {
+                                        startSite.strength -= originSite.strength
+                                        if (destinationSite.strength <= originSite.strength) {
+                                            destinationSite.strength = originSite.strength - destinationSite.strength
+                                            destinationSite.owner = originSite.owner
+                                        } else {
+                                            destinationSite.strength -= originSite.strength
+                                        }
+                                    }
+
+                                    if (destinationSite.strength > 255) destinationSite.strength = 255
+
+                                    allMoves.add(move)
+                                }
+                            }
+                        }
+                    }
+            numLoops++
+            logger.info("alltargets left: ${allTargets.size}")
+            logger.info("loop: ${System.currentTimeMillis() - startTime}ms")
         }
-    }
 
-    fun shortCircuit() = if (System.currentTimeMillis() - start > MAXIMUM_TIME) {
-        endGameLoop()
-        true
-    } else false
-
-    fun updateMovedIndex() {
-        movedLocations = allMoves.map { it.loc }.toSet()
+        logger.info("numLoops: $numLoops")
+        logger.info("numPathed: $numPathed")
+        logger.info("took: ${System.currentTimeMillis() - startTime}ms")
+        if (allTargets.isNotEmpty()) {
+            logger.info("alltargets: $allTargets")
+        }
     }
 
     @Throws(java.io.IOException::class)
@@ -172,6 +126,7 @@ object MyBot {
         while (true) {
             // get frame
             gameMap = Networking.getFrame()
+            nextMap = GameMap(gameMap)
 
             start = System.currentTimeMillis()
             logger.info("===== Turn: ${turn++} at $start =====")
@@ -179,38 +134,27 @@ object MyBot {
             lastTurnMoves = allMoves.associateBy { it.loc }
             playerStats = playerStats()
             averageCost = points
-                    .map { it.cost() }
+                    .map { it.cost(it) }
                     .average()
                     .toInt()
 
             // reset all moves
             allMoves = mutableSetOf()
+            allTargets = mutableMapOf()
 
             // make moves based on value
-            allMoves.addAll(makeValueMoves())
-
-            if (shortCircuit()) continue
-            removeUnwiseMoves()
-            updateMovedIndex()
+            makeValueMoves().forEach { allTargets.put(it.origin, it.destination) }
 
             innerBorderCells = points.filter { it.isInnerBorder() }
 
             // make joint moves
-            allMoves.addAll(makeJointMoves())
-
-            if (shortCircuit()) continue
-            removeUnwiseMoves()
-            updateMovedIndex()
+            makeJointMoves().forEach { allTargets.put(it.origin, it.destination) }
 
             // make moves that abandon cells that will take too long to conquer
-            allMoves.addAll(makeAbandonMoves())
-
-            if (shortCircuit()) continue
-            removeUnwiseMoves()
-            updateMovedIndex()
+            makeAbandonMoves().forEach { allTargets.put(it.origin, it.destination) }
 
             // find a friendly unit and help out
-            allMoves.addAll(makeAssistMoves())
+            makeAssistMoves().forEach { allTargets.put(it.origin, it.destination) }
 
             endGameLoop()
         }
@@ -218,7 +162,7 @@ object MyBot {
 
     // MOVE LOGIC
 
-    fun makeValueMoves(): List<Move> {
+    fun makeValueMoves(): List<Target> {
         // select a move for each point based on site value
         val moves = points
                 .filter { it.site().isMine() && it.site().strength > 0 }
@@ -229,7 +173,7 @@ object MyBot {
 
                         if (targets.isNotEmpty()) {
                             val best = targets.sortedBy { it.loc.site().value(it.origin) }.first()
-                            Move(best.origin, best.direction)
+                            Target(best.origin, best.loc)
                         } else null
                     } else if (loc.site().strength > Math.min(loc.site().production * 4, MINIMUM_STRENGTH * 3 + 1)
                             && loc !in lastTurnMoves) {
@@ -239,9 +183,9 @@ object MyBot {
                                 .firstOrNull()
 
                         if (best != null) {
-                            moveTowards(loc, best)
+                            Target(loc, best)
                         } else {
-                            Move(loc, loc.straightClosestEdge())
+                            Target(loc, loc.straightClosestEdgeLocation())
                         }
                     } else null
                 }
@@ -250,24 +194,24 @@ object MyBot {
         return moves
     }
 
-    fun makeJointMoves(): List<Move> {
+    fun makeJointMoves(): List<Target> {
         // look for opportunities to combine strength
         val moves = innerBorderCells
-                .filterNot { it in movedLocations }
+                .filterNot { it in allTargets }
                 .filter { it.site().strength > 0 }
                 .map { it.bestTarget() }
                 .filterNotNull()
                 .groupBy { it.loc }
                 .filter { it.value.sumBy { it.origin.site().strength } > it.key.site().strength }
-                .flatMap { it.value.map { Move(it.origin, it.direction) } }
+                .flatMap { it.value.map { Target(it.origin, it.loc) } }
 
         return moves
     }
 
-    fun makeAbandonMoves(): List<Move> {
+    fun makeAbandonMoves(): List<Target> {
         // abandon cells that will take too long to conquer
         val moves = innerBorderCells
-                .filterNot { it in movedLocations }
+                .filterNot { it in allTargets }
                 .filter { it.site().strength > MINIMUM_STRENGTH }
                 .map { it.enemies() }
                 .filter { it.isNotEmpty() }
@@ -282,21 +226,21 @@ object MyBot {
                     } else null
                 }
                 .filterNotNull()
-                .map { Move(it.origin, it.direction) }
+                .map { Target(it.origin, it.loc) }
 
         return moves
     }
 
-    fun makeAssistMoves(): List<Move> {
+    fun makeAssistMoves(): List<Target> {
         // find a friendly unit and help out
         val moves = innerBorderCells
-                .filterNot { it in movedLocations }
+                .filterNot { it in allTargets }
                 .filter { it.site().strength > MINIMUM_STRENGTH }
                 .map { self ->
                     val bestTarget = self.bestTarget()
 
                     self.friends()
-                            .filter { it.loc.isInnerBorder() && it.loc !in movedLocations }
+                            .filter { it.loc.isInnerBorder() && it.loc !in allTargets }
                             .map { friend ->
                                 val friendBestTarget = friend.loc.bestTarget()
 
@@ -314,7 +258,7 @@ object MyBot {
                             .firstOrNull()
                 }
                 .filterNotNull()
-                .map { Move(it.origin, it.direction) }
+                .map { Target(it.origin, it.loc) }
 
         return moves
     }
@@ -359,6 +303,8 @@ object MyBot {
 
     fun Location.neighbors() = Direction.CARDINALS.map { RelativeLocation(this, it) }
 
+    fun Location.neighborsAndSelf() = Direction.DIRECTIONS.map { RelativeLocation(this, it) }
+
     fun Location.enemies() = this.neighbors().filterNot { it.loc.site().isMine() }
 
     fun Location.friends() = this.neighbors().filter { it.loc.site().isMine() }
@@ -369,7 +315,7 @@ object MyBot {
 
     fun Location.site() = gameMap.getSite(this)
 
-    fun Location.straightClosestEdge(): Direction {
+    fun Location.straightClosestEdgeLocation(): Location {
         val maxDistance = Math.min(gameMap.width, gameMap.height) / 2
 
         return Direction.CARDINALS.map {
@@ -381,8 +327,8 @@ object MyBot {
                 distance++
             }
 
-            it to distance
-        }.sortedBy { it.second }.first().first
+            distance to loc
+        }.sortedBy { it.first }.first().second
     }
 
     fun Location.allNeighborsWithin(distance: Int) = points.filter { gameMap.getDistance(it, this) < distance }
@@ -527,11 +473,12 @@ object MyBot {
 
     val INFINITY: Int = Int.MAX_VALUE / 2
 
-    fun Location.cost() = if (this.site().isMine())
-        this.site().production * this.site().production
-    else this.site().strength
-
-    fun List<Location>.cost() = this.sumBy { it.cost() }
+    fun Location.cost(from: Location) =
+            if (this == from) -this.site().production
+            else if (nextMap.getSite(this).isMine()) {
+                if (nextMap.getSite(from).strength + nextMap.getSite(this).strength > 255) 16384
+                else 0
+            } else nextMap.getSite(this).strength
 
     fun astar(start: Location, goal: Location): List<Location>? {
         val closedSet = mutableSetOf<Location>()
@@ -554,11 +501,16 @@ object MyBot {
             closedSet.add(current)
 
             for (neighbor in current.neighbors()) {
+                if (nextMap.getSite(neighbor.loc).isMine() &&
+                        current.site().strength + nextMap.getSite(neighbor.loc).strength > 287) {
+                    continue
+                }
+
                 if (neighbor.loc in closedSet) {
                     continue
                 }
 
-                val tentativeGScore = gScore.getOrElse(current, { INFINITY }) + neighbor.loc.cost()
+                val tentativeGScore = gScore.getOrElse(current, { INFINITY }) + neighbor.loc.cost(current)
                 if (neighbor.loc !in openSet) {
                     openSet.add(neighbor.loc)
                 } else if (tentativeGScore >= gScore.getOrElse(neighbor.loc, { INFINITY })) {
