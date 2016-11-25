@@ -14,3 +14,7 @@ fun initializeLogging() {
     fileHandler.formatter = formatter
     logger.addHandler(fileHandler)
 }
+
+fun log(vararg stuff: Any) {
+    logger.info(stuff.map { "$it" }.joinToString(" "))
+}
