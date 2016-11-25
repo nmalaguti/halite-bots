@@ -64,7 +64,7 @@ def run_1v1():
 
         ratings.append(rating)
 
-    commands = ['bots/%s/run.sh' % bot for bot in bots]
+    commands = ['bots/available/%s/run.sh' % bot for bot in bots]
     map_size = choice(MAP_SIZES)
     seed, ranking1 = run_halite(commands, map_size)
 
@@ -72,10 +72,13 @@ def run_1v1():
 
     if ranking1[0] == ranking2[0]:
         updated = rate_1vs1(ratings[0], ratings[1], drawn=True)
+        print("draw")
     elif ranking1[0] == 1:
         updated = rate_1vs1(ratings[0], ratings[1])
+        print(bots[0])
     else:
         updated = rate_1vs1(ratings[1], ratings[0])
+        print(bots[1])
 
     for bot, rating in zip(bots, updated):
         db[bot]['mu'] = rating.mu

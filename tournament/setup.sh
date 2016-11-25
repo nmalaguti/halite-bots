@@ -1,9 +1,14 @@
 #!/usr/bin/env bash
 
 # install halite
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/HaliteChallenge/Halite/master/environment/install.sh)"
+if [[ ! -f halite ]]; then
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/HaliteChallenge/Halite/master/environment/install.sh)"
+fi
 
-virtualenv -p python3 venv
+if [[ ! -d venv ]]; then
+    virtualenv -p python3 venv
+fi
+
 source ./venv/bin/activate
 
 pip install -r requirements.txt
