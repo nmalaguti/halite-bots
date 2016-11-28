@@ -118,11 +118,16 @@ object MyBot {
 
     fun logDistanceToEnemyGrid() {
         val builder = StringBuilder("\n")
-
+        builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
+        builder.append("\n")
         for (y in 0 until gameMap.height) {
+            builder.append("$y".take(3).padEnd(4) + " ")
             builder.append(distanceToEnemyGrid[y].map { "$it".take(3).padEnd(4) }.joinToString(" "))
+            builder.append(" " + "$y".take(3).padEnd(4))
             builder.append("\n")
         }
+        builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
+        builder.append("\n")
 
         logger.info(builder.toString())
     }
@@ -137,9 +142,9 @@ object MyBot {
                     val target = loc.neighbors()
                             .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] < distanceToEnemyGrid[loc.y][loc.x] }
                             .sortedByDescending { it.loc.site().overkill() }
-                            .filter { !loc.cameFrom(it.loc) }
                             .filter {
                                 val nextSite = nextMap.getSite(it.loc)
+
                                 if (nextSite.isEnvironment() && nextSite.strength == 0) {
                                     // enemy space
                                     loc.site().strength > Math.max(loc.site().production * 3, MINIMUM_STRENGTH) &&
@@ -217,7 +222,7 @@ object MyBot {
                 it.loc.site().strength + it.loc.site().production
             }.sum()
 
-    fun Site.resource() = if (!this.isMine()) (this.strength / this.production.toDouble()).toInt() else 999
+    fun Site.resource() = if (!this.isMine()) (this.strength / this.production.toDouble()).toInt() else 9999
 
     // LOCATION
 
@@ -229,12 +234,9 @@ object MyBot {
             !this.site().isMine() &&
                     this.neighbors().any { it.loc.site().isMine() }
 
-    fun Location.cameFrom(source: Location): Boolean {
-        val moveFromDestination = lastTurnMoves[source]
-        return moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == this
-    }
-
     fun Location.neighbors() = Direction.CARDINALS.map { RelativeLocation(this, it) }
+
+    fun Location.neighborsAndSelf() = Direction.DIRECTIONS.map { RelativeLocation(this, it) }
 
     fun Location.enemies() = this.neighbors().filterNot { it.loc.site().isMine() }
 
