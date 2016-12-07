@@ -6,6 +6,7 @@ val BOT_NAME = "MyBlacklistBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
+val MAXIMUM_STRENGTH = 256
 
 object MyBot {
     lateinit var gameMap: GameMap
@@ -128,7 +129,60 @@ object MyBot {
 
     fun makeBattleMoves() {
         val blackoutCells = mutableSetOf<Location>()
-        val alreadyMoved = mutableSetOf<Location>()
+
+        val sources = mutableMapOf<Location, Direction>()
+        val destinations = mutableMapOf<Location, Direction>()
+
+        val top2Production = playerStats.map { it.key to it.value.production }.sortedBy { it.second }.take(2)
+
+        fun Location.swappable(source: Location) =
+                this != source &&
+                        this.site().isMine() &&
+                        (this !in sources || sources[this] == Direction.STILL) &&
+                        (this !in destinations || destinations[this] == Direction.STILL) &&
+                        this.site().strength < source.site().strength
+
+        fun finalizeMove(source: Location, target: Location, blackout: Boolean) {
+            if (target.swappable(source) &&
+                    nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
+                // swap
+                val move1 = moveTowards(source, target)
+                val move2 = moveTowards(target, source)
+
+                updateNextMap(move1)
+                updateNextMap(move2)
+
+                allMoves.add(move1)
+                allMoves.add(move2)
+
+                sources.put(source, move1.dir)
+                sources.put(target, move2.dir)
+                destinations.put(source, move2.dir)
+                destinations.put(target, move1.dir)
+            } else {
+                var move = moveTowards(source, target)
+
+                if (!blackout) {
+                    val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
+                    if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
+                        move = Move(source, Direction.STILL)
+                    }
+
+                    if (nextMap.getSite(target).isMine() && gameMap.getSite(source).strength + nextMap.getSite(target).strength >= MAXIMUM_STRENGTH) {
+                        move = Move(source, Direction.STILL)
+                    }
+                }
+
+                updateNextMap(move)
+
+                allMoves.add(move)
+
+                if (blackout) blackoutCells.add(source)
+
+                sources.put(source, move.dir)
+                destinations.put(target, move.dir)
+            }
+        }
 
         points
                 .filter { it.site().isMine() && it.site().strength > 0 }
@@ -138,66 +192,37 @@ object MyBot {
                     // on the edge of battle
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
-                    var tar = loc.neighbors()
-                            .filter { it.loc.site().isEnvironment() && it.loc.site().strength == 0 }
-                            .filter { it.loc !in blackoutCells }
-                            .filter { nextMap.getSite(it.loc).strength + loc.site().strength < (256 + MINIMUM_STRENGTH) }
-                            .sortedByDescending { it.loc.site().overkill() }
-                            .firstOrNull()?.loc
+                    val target =
+                            if (loc.site().strength < loc.site().production * 2 || loc.site().strength < MINIMUM_STRENGTH) loc
+                            else loc.neighbors()
+                                    .filter { it.loc.site().isEnvironment() && it.loc.site().strength == 0 }
+                                    .filter { it.loc !in blackoutCells }
+                                    .filter {
+                                        nextMap.getSite(it.loc).strength + loc.site().strength < MAXIMUM_STRENGTH ||
+                                                it.loc.swappable(loc)
+                                    }
+                                    .sortedByDescending { it.loc.site().overkill() }
+                                    .firstOrNull()?.loc ?: loc
 
-                    if (tar == null) {
-                        tar = loc
-                    }
-
-                    val move =
-                            if (loc != tar) moveTowards(loc, tar)
-                            else Move(loc, Direction.STILL)
-
-                    val originSite = gameMap.getSite(loc)
-                    val startSite = nextMap.getSite(loc)
-                    val destinationSite = nextMap.getSite(tar)
-
-                    if (startSite.owner == destinationSite.owner) {
-                        if (move.dir == Direction.STILL) {
-                            destinationSite.strength += destinationSite.production
-                        } else {
-                            startSite.strength -= originSite.strength
-                            destinationSite.strength += originSite.strength
-                        }
-                    } else {
-                        startSite.strength -= originSite.strength
-                        if (destinationSite.strength <= originSite.strength) {
-                            destinationSite.strength = originSite.strength
-                            destinationSite.owner = originSite.owner
-                        } else {
-                            destinationSite.strength -= originSite.strength
-                        }
-                    }
-
-                    if (destinationSite.strength > 255) destinationSite.strength = 255
-
-                    allMoves.add(move)
-                    alreadyMoved.add(loc)
-                    blackoutCells.addAll(tar.neighbors().map { it.loc })
+                    finalizeMove(loc, target, true)
                 }
 
         points
-                .filter { it.site().isMine() && it !in alreadyMoved }
-                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { it.neighbors().filterNot { it.loc.site().isMine() }.size }))
+                .filter { it.site().isMine() && it !in sources }
+                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().strength }, { it.neighbors().filterNot { it.loc.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
                     var target = loc.neighbors()
                             .filter { it.loc !in blackoutCells }
                             .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] < distanceToEnemyGrid[loc.y][loc.x] }
-                            .sortedByDescending { it.loc.site().overkill() }
                             .filter {
                                 val nextSite = nextMap.getSite(it.loc)
 
                                 if (nextSite.isEnvironment() && nextSite.strength == 0) {
                                     // enemy space
                                     loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
-                                            nextSite.strength + loc.site().strength < 256 + MINIMUM_STRENGTH
+                                            nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH
                                 } else if (nextSite.isEnvironment()) {
                                     // environment
                                     loc.site().strength > loc.site().production * 2 &&
@@ -205,54 +230,98 @@ object MyBot {
                                 } else {
                                     // mine
                                     loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
-                                            nextSite.strength + loc.site().strength < 256 + MINIMUM_STRENGTH
+                                            (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.loc.swappable(loc))
                                 }
                             }
+                            .sortedByDescending { it.loc.site().overkill() }
                             .firstOrNull()?.loc
+
+
+//                    if (target == null && top2Production[0].first == id && top2Production[0].second > top2Production[1].second * 1.1) {
+//                        target = loc.neighbors()
+//                                .filter { it.loc !in blackoutCells }
+//                                .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] < distanceToEnemyGrid[loc.y][loc.x] }
+//                                .map {
+//                                    val nextSite = nextMap.getSite(it.loc)
+//
+//                                    if (nextSite.isEnvironment() && nextSite.strength == 0) {
+//                                        // enemy space
+//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
+//                                            // wait more
+//                                            null
+//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
+//                                            // flow problems...
+//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
+//                                            loc.neighbors()
+//                                                    .filter {
+//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
+//                                                        else true
+//                                                    }
+//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
+//                                                    .firstOrNull()
+//                                        } else {
+//                                            // who knows?
+//                                            null
+//                                        }
+//                                    } else if (nextSite.isMine()) {
+//                                        // mine
+//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
+//                                            // wait more
+//                                            null
+//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
+//                                            // flow problems...
+//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
+//                                            loc.neighbors()
+//                                                    .filter {
+//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
+//                                                        else true
+//                                                    }
+//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
+//                                                    .firstOrNull()
+//                                        } else {
+//                                            // who knows?
+//                                            null
+//                                        }
+//                                    } else null
+//                                }
+//                                .filterNotNull()
+//                                .sortedByDescending { it.loc.site().overkill() }
+//                                .firstOrNull()?.loc
+//                    }
 
                     if (target != null) {
                         if (target in blackoutCells) target = loc
-                        var move =
-                                if (loc != target) moveTowards(loc, target)
-                                else Move(loc, Direction.STILL)
-
-                        val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
-                        if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
-                            target = loc
-                            move = Move(loc, Direction.STILL)
-                        }
-
-                        if (nextMap.getSite(target).isMine() && gameMap.getSite(loc).strength + nextMap.getSite(target).strength >= 256 + MINIMUM_STRENGTH) {
-                            target = loc
-                            move = Move(loc, Direction.STILL)
-                        }
-
-                        val originSite = gameMap.getSite(loc)
-                        val startSite = nextMap.getSite(loc)
-                        val destinationSite = nextMap.getSite(target)
-
-                        if (startSite.owner == destinationSite.owner) {
-                            if (move.dir == Direction.STILL) {
-                                destinationSite.strength += destinationSite.production
-                            } else {
-                                startSite.strength -= originSite.strength
-                                destinationSite.strength += originSite.strength
-                            }
-                        } else {
-                            startSite.strength -= originSite.strength
-                            if (destinationSite.strength <= originSite.strength) {
-                                destinationSite.strength = originSite.strength - destinationSite.strength
-                                destinationSite.owner = originSite.owner
-                            } else {
-                                destinationSite.strength -= originSite.strength
-                            }
-                        }
-
-                        if (destinationSite.strength > 255) destinationSite.strength = 255
-
-                        allMoves.add(move)
+                        finalizeMove(loc, target, false)
                     }
                 }
+    }
+
+    fun updateNextMap(move: Move) {
+        val source = move.loc
+        val target = move.loc.move(move.dir)
+
+        val originSite = gameMap.getSite(source)
+        val startSite = nextMap.getSite(source)
+        val destinationSite = nextMap.getSite(target)
+
+        if (startSite.owner == destinationSite.owner) {
+            if (move.dir == Direction.STILL) {
+                destinationSite.strength += destinationSite.production
+            } else {
+                startSite.strength -= originSite.strength
+                destinationSite.strength += originSite.strength
+            }
+        } else {
+            startSite.strength -= originSite.strength
+            if (destinationSite.strength <= originSite.strength) {
+                destinationSite.strength = originSite.strength - destinationSite.strength
+                destinationSite.owner = originSite.owner
+            } else {
+                destinationSite.strength -= originSite.strength
+            }
+        }
+
+        // if (destinationSite.strength > 255) destinationSite.strength = 255
     }
 
     // EXTENSIONS METHODS
@@ -344,6 +413,7 @@ object MyBot {
     fun permutations(gameMap: GameMap) = permutations(0 until gameMap.height, 0 until gameMap.width)
 
     fun moveTowards(start: Location, end: Location): Move {
+        if (start == end) return Move(start, Direction.STILL)
         val angle = gameMap.getAngle(start, end)
         return if (angle >= -PI4 && angle <= PI4) {
             Move(start, Direction.WEST)
