@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBlacklistBot"
+val BOT_NAME = "MyFlowControlBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -95,7 +95,7 @@ object MyBot {
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
-                                    2 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! + current.site().strength / 100
+                                    2 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!!
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
@@ -132,8 +132,6 @@ object MyBot {
 
         val sources = mutableMapOf<Location, Direction>()
         val destinations = mutableMapOf<Location, Direction>()
-
-        val top2Production = playerStats.map { it.key to it.value.production }.sortedBy { it.second }.take(2)
 
         fun Location.swappable(source: Location) =
                 this != source &&
@@ -177,7 +175,7 @@ object MyBot {
 
                 allMoves.add(move)
 
-                if (blackout) blackoutCells.add(source)
+                if (blackout && source != target) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.put(target, move.dir)
@@ -236,59 +234,6 @@ object MyBot {
                             .sortedByDescending { it.loc.site().overkill() }
                             .firstOrNull()?.loc
 
-
-//                    if (target == null && top2Production[0].first == id && top2Production[0].second > top2Production[1].second * 1.1) {
-//                        target = loc.neighbors()
-//                                .filter { it.loc !in blackoutCells }
-//                                .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] < distanceToEnemyGrid[loc.y][loc.x] }
-//                                .map {
-//                                    val nextSite = nextMap.getSite(it.loc)
-//
-//                                    if (nextSite.isEnvironment() && nextSite.strength == 0) {
-//                                        // enemy space
-//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
-//                                            // wait more
-//                                            null
-//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
-//                                            // flow problems...
-//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
-//                                            loc.neighbors()
-//                                                    .filter {
-//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
-//                                                        else true
-//                                                    }
-//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
-//                                                    .firstOrNull()
-//                                        } else {
-//                                            // who knows?
-//                                            null
-//                                        }
-//                                    } else if (nextSite.isMine()) {
-//                                        // mine
-//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
-//                                            // wait more
-//                                            null
-//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
-//                                            // flow problems...
-//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
-//                                            loc.neighbors()
-//                                                    .filter {
-//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
-//                                                        else true
-//                                                    }
-//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
-//                                                    .firstOrNull()
-//                                        } else {
-//                                            // who knows?
-//                                            null
-//                                        }
-//                                    } else null
-//                                }
-//                                .filterNotNull()
-//                                .sortedByDescending { it.loc.site().overkill() }
-//                                .firstOrNull()?.loc
-//                    }
-
                     if (target != null) {
                         if (target in blackoutCells) target = loc
                         finalizeMove(loc, target, false)
@@ -338,14 +283,15 @@ object MyBot {
             .map {
                 if (it.loc.site().isOtherPlayer()) it.loc.site().strength + it.loc.site().production
                 else if (nextMap.getSite(it.loc).isMine()) it.loc.allNeighborsWithin(2)
-                        .filter { it.site().isMine() }
+                        .filter { nextMap.getSite(it).isMine() }
                         .map { -nextMap.getSite(it).strength }
                         .sum()
                 else 0
             }.sum()
 
     fun Site.resource() = if (!this.isMine())
-        (this.strength / this.production.toDouble()).toInt()
+        if (this.strength == 0) this.loc.allNeighborsWithin(3).filter { it.site().isMine() && it.site().strength == 255 }.size
+        else (this.strength / this.production.toDouble()).toInt()
     else 9999
 
     // LOCATION
