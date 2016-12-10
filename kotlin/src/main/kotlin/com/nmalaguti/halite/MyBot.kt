@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyProdGradientBot"
+val BOT_NAME = "MyRatioBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -18,8 +18,10 @@ object MyBot {
     var start = System.currentTimeMillis()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
-    var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
+    var distanceToEnemyGrid = mutableListOf<MutableList<Double>>()
     var stillMax: Int = 0
+    var territory: Int = 0
+    var border: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -59,10 +61,13 @@ object MyBot {
             buildDistanceToEnemyGrid()
 
             stillMax = 0
+            territory = points.filter { it.site().isMine() }.size
+            border = points.filter { it.isInnerBorder() }.size
 
             makeBattleMoves()
 
             logger.info("stillMax: $stillMax")
+            logger.info("territory/border: ${territory / border.toDouble()}")
 
             endGameLoop()
         }
@@ -71,9 +76,9 @@ object MyBot {
     // MOVE LOGIC
 
     fun buildDistanceToEnemyGrid() {
-        distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
+        distanceToEnemyGrid = mutableListOf<MutableList<Double>>()
         for (y in 0 until gameMap.height) {
-            val row = mutableListOf<Int>()
+            val row = mutableListOf<Double>()
             for (x in 0 until gameMap.width) {
                 row.add(Location(x, y).site().resource())
             }
@@ -100,7 +105,8 @@ object MyBot {
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
-                                    1 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
+                                    (territory / border.toDouble()) - 1 +
+                                            current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
                                             (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
@@ -192,7 +198,7 @@ object MyBot {
 
                 sources.put(source, move.dir)
                 destinations.put(target, move.dir)
-                if (source.site().strength == 255 && move.dir == Direction.STILL) stillMax += 1
+                if (source.site().strength > 200 && move.dir == Direction.STILL) stillMax += 1
             }
         }
 
@@ -252,7 +258,7 @@ object MyBot {
                         if (target in blackoutCells) target = loc
                         finalizeMove(loc, target, false)
                     } else {
-                        if (loc.site().strength == 255) {
+                        if (loc.site().strength > 200) {
                             stillMax += 1
                         }
                     }
@@ -308,9 +314,9 @@ object MyBot {
             }.sum()
 
     fun Site.resource() = if (!this.isMine()) {
-        Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt())
+        Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt()).toDouble()
     }
-    else 9999
+    else 9999.0
 
     // LOCATION
 
