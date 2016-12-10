@@ -19,6 +19,7 @@ object MyBot {
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
+    var stillMax: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -57,7 +58,11 @@ object MyBot {
 
             buildDistanceToEnemyGrid()
 
+            stillMax = 0
+
             makeBattleMoves()
+
+            logger.info("stillMax: $stillMax")
 
             endGameLoop()
         }
@@ -96,7 +101,7 @@ object MyBot {
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
-                                            (Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()
+                                            (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
@@ -134,18 +139,23 @@ object MyBot {
         val sources = mutableMapOf<Location, Direction>()
         val destinations = mutableMapOf<Location, Direction>()
 
-        val top2Production = playerStats.map { it.key to it.value.production }.sortedBy { it.second }.take(2)
-
         fun Location.swappable(source: Location) =
                 this != source &&
                         this.site().isMine() &&
                         (this !in sources || sources[this] == Direction.STILL) &&
                         (this !in destinations || destinations[this] == Direction.STILL) &&
-                        this.site().strength < source.site().strength
+                        ((source.site().strength == 255 && this.site().strength < 255) ||
+                                this.site().strength + MINIMUM_STRENGTH < source.site().strength)
 
         fun finalizeMove(source: Location, target: Location, blackout: Boolean) {
             if (target.swappable(source) &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
+
+//                val moveFromDestination = lastTurnMoves[target]
+//                if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == source) {
+//                    return
+//                }
+
                 // swap
                 val move1 = moveTowards(source, target)
                 val move2 = moveTowards(target, source)
@@ -182,6 +192,7 @@ object MyBot {
 
                 sources.put(source, move.dir)
                 destinations.put(target, move.dir)
+                if (source.site().strength == 255 && move.dir == Direction.STILL) stillMax += 1
             }
         }
 
@@ -237,62 +248,13 @@ object MyBot {
                             .sortedByDescending { it.loc.site().overkill() }
                             .firstOrNull()?.loc
 
-
-//                    if (target == null && top2Production[0].first == id && top2Production[0].second > top2Production[1].second * 1.1) {
-//                        target = loc.neighbors()
-//                                .filter { it.loc !in blackoutCells }
-//                                .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] < distanceToEnemyGrid[loc.y][loc.x] }
-//                                .map {
-//                                    val nextSite = nextMap.getSite(it.loc)
-//
-//                                    if (nextSite.isEnvironment() && nextSite.strength == 0) {
-//                                        // enemy space
-//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
-//                                            // wait more
-//                                            null
-//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
-//                                            // flow problems...
-//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
-//                                            loc.neighbors()
-//                                                    .filter {
-//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
-//                                                        else true
-//                                                    }
-//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
-//                                                    .firstOrNull()
-//                                        } else {
-//                                            // who knows?
-//                                            null
-//                                        }
-//                                    } else if (nextSite.isMine()) {
-//                                        // mine
-//                                        if (loc.site().strength <= Math.max(loc.site().production * 3, MINIMUM_STRENGTH)) {
-//                                            // wait more
-//                                            null
-//                                        } else if (nextSite.strength + loc.site().strength >= MAXIMUM_STRENGTH) {
-//                                            // flow problems...
-//                                            logger.info("flow problem at ${loc} -> ${it.loc}")
-//                                            loc.neighbors()
-//                                                    .filter {
-//                                                        if (nextMap.getSite(it.loc).isMine()) nextSite.strength + nextMap.getSite(it.loc).strength < MAXIMUM_STRENGTH
-//                                                        else true
-//                                                    }
-//                                                    .sortedByDescending { distanceToEnemyGrid[it.loc.y][it.loc.x] }
-//                                                    .firstOrNull()
-//                                        } else {
-//                                            // who knows?
-//                                            null
-//                                        }
-//                                    } else null
-//                                }
-//                                .filterNotNull()
-//                                .sortedByDescending { it.loc.site().overkill() }
-//                                .firstOrNull()?.loc
-//                    }
-
                     if (target != null) {
                         if (target in blackoutCells) target = loc
                         finalizeMove(loc, target, false)
+                    } else {
+                        if (loc.site().strength == 255) {
+                            stillMax += 1
+                        }
                     }
                 }
     }
@@ -345,8 +307,9 @@ object MyBot {
                 else 0
             }.sum()
 
-    fun Site.resource() = if (!this.isMine())
-        (this.strength / this.production.toDouble()).toInt()
+    fun Site.resource() = if (!this.isMine()) {
+        Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt())
+    }
     else 9999
 
     // LOCATION
