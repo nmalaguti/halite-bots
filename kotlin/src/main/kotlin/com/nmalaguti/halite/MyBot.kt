@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBlacklistBot"
+val BOT_NAME = "MyProdGradientBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -95,7 +95,8 @@ object MyBot {
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
-                                    2 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! + current.site().strength / 100
+                                    1 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
+                                            (Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
