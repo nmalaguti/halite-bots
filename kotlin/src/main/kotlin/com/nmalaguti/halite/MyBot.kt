@@ -177,7 +177,7 @@ object MyBot {
 
                 allMoves.add(move)
 
-                if (blackout) blackoutCells.add(source)
+                if (blackout && target != source) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.put(target, move.dir)
