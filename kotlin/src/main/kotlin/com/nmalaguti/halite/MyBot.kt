@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyProdGradientBot"
+val BOT_NAME = "MyProdGradientFixedBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -151,11 +151,6 @@ object MyBot {
             if (target.swappable(source) &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
 
-//                val moveFromDestination = lastTurnMoves[target]
-//                if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == source) {
-//                    return
-//                }
-
                 // swap
                 val move1 = moveTowards(source, target)
                 val move2 = moveTowards(target, source)
@@ -284,7 +279,7 @@ object MyBot {
             }
         }
 
-        // if (destinationSite.strength > 255) destinationSite.strength = 255
+        if (destinationSite.strength > 255) destinationSite.strength = 255
     }
 
     // EXTENSIONS METHODS
@@ -297,15 +292,20 @@ object MyBot {
 
     fun Site.isMine() = this.owner == id
 
-    fun Site.overkill() = this.loc.neighbors()
-            .map {
-                if (it.loc.site().isOtherPlayer()) it.loc.site().strength + it.loc.site().production
-                else if (nextMap.getSite(it.loc).isMine()) it.loc.allNeighborsWithin(2)
-                        .filter { it.site().isMine() }
-                        .map { -nextMap.getSite(it).strength }
-                        .sum()
-                else 0
-            }.sum()
+    fun Site.overkill() =
+            if (this.isEnvironment() && this.strength > 0) {
+                -distanceToEnemyGrid[this.loc.y][this.loc.x]
+            } else {
+                this.loc.neighbors()
+                        .map {
+                            if (it.loc.site().isOtherPlayer()) it.loc.site().strength + it.loc.site().production
+                            else if (nextMap.getSite(it.loc).isMine()) it.loc.allNeighborsWithin(2)
+                                    .filter { it.site().isMine() }
+                                    .map { -nextMap.getSite(it).strength }
+                                    .sum()
+                            else 0
+                        }.sum()
+            }
 
     fun Site.resource() = if (!this.isMine()) {
         Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt())
