@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyProdGradientFixedBot"
+val BOT_NAME = "MyThugBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -20,6 +20,8 @@ object MyBot {
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
     var stillMax: Int = 0
+    var territory: Int = 0
+    var border: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -59,6 +61,8 @@ object MyBot {
             buildDistanceToEnemyGrid()
 
             stillMax = 0
+            territory = points.filter { it.site().isMine() }.size
+            border = points.filter { it.isInnerBorder() }.size
 
             makeBattleMoves()
 
@@ -100,7 +104,9 @@ object MyBot {
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
-                                    1 + current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
+//                                    (territory / border.toDouble()).toInt() +
+                                    1 +
+                                            current.neighbors().map { distanceToEnemyGrid[it.loc.y][it.loc.x] }.min()!! +
                                             (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
@@ -145,7 +151,7 @@ object MyBot {
                         (this !in sources || sources[this] == Direction.STILL) &&
                         (this !in destinations || destinations[this] == Direction.STILL) &&
                         ((source.site().strength == 255 && this.site().strength < 255) ||
-                                this.site().strength + MINIMUM_STRENGTH < source.site().strength)
+                                this.site().strength + 15 < source.site().strength)
 
         fun finalizeMove(source: Location, target: Location, blackout: Boolean) {
             if (target.swappable(source) &&
@@ -183,7 +189,7 @@ object MyBot {
 
                 allMoves.add(move)
 
-                if (blackout && target != source) blackoutCells.add(source)
+                if (target != source) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.put(target, move.dir)
@@ -232,11 +238,10 @@ object MyBot {
                                             nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH
                                 } else if (nextSite.isEnvironment()) {
                                     // environment
-                                    loc.site().strength > loc.site().production * 2 &&
-                                            nextSite.strength < loc.site().strength
+                                    nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
+                                    loc.site().strength > Math.max(loc.site().production * 5, MINIMUM_STRENGTH * 2) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.loc.swappable(loc))
                                 }
                             }
