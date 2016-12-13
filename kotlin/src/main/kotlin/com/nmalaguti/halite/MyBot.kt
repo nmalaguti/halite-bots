@@ -2,7 +2,7 @@ package com.nmalaguti.halite
 
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySweetBot"
+val BOT_NAME = "MyChargerBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -22,7 +22,6 @@ object MyBot {
     var stillMax: Int = 0
     var territory: Int = 0
     var border: Int = 0
-    var best: Location? = null
 
     fun init() {
         val init = Networking.getInit()
@@ -58,10 +57,6 @@ object MyBot {
 
             // reset all moves
             allMoves = mutableSetOf()
-
-            best = points
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                    .minBy { it.site().strength / it.site().production.toDouble() }
 
             buildDistanceToEnemyGrid()
 
@@ -248,7 +243,7 @@ object MyBot {
                                 } else {
                                     // mine
                                     loc.site().strength > Math.max(loc.site().production * 5,
-                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.065, turn.toDouble()).toInt())) &&
+                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.loc.swappable(loc))
                                 }
                             }
@@ -320,8 +315,13 @@ object MyBot {
             }
 
     fun Site.resource() = if (!this.isMine()) {
-        Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt() -
-                if (this.loc == best) 1 else 0)
+        (this.loc.neighbors()
+                .filter { it.loc.site().isEnvironment() && it.loc.site().strength > 0 && it.loc.site().production > 0 }
+                .map {
+                    (it.loc.site().strength / (it.loc.site().production + stillMax).toDouble())
+                }
+                .average() + (this.strength / (this.production + stillMax).toDouble()))
+                .toInt() / 2
     }
     else 9999
 
