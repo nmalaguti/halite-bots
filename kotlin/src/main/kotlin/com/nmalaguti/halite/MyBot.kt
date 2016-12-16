@@ -1,8 +1,9 @@
 package com.nmalaguti.halite
 
+import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyChargerBot"
+val BOT_NAME = "MyRandomWalkBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -22,6 +23,7 @@ object MyBot {
     var stillMax: Int = 0
     var territory: Int = 0
     var border: Int = 0
+    var madeContact: Boolean = false
 
     fun init() {
         val init = Networking.getInit()
@@ -64,6 +66,10 @@ object MyBot {
             territory = points.filter { it.site().isMine() }.size
             border = points.filter { it.isInnerBorder() }.size
 
+            if (points.any { it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.loc.site().isMine() }}) {
+                madeContact = true
+            }
+
             makeBattleMoves()
 
             logger.info("stillMax: $stillMax")
@@ -85,11 +91,49 @@ object MyBot {
             distanceToEnemyGrid.add(row)
         }
 
+        // update outer border based on random walks?
+        points.filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0}.forEach {
+            distanceToEnemyGrid[it.y][it.x] = randomWalk(it)
+        }
+
         points.filter { it.isOuterBorder() }.sortedBy { distanceToEnemyGrid[it.y][it.x] }.take(20).forEach {
             walkGridFrom(mutableSetOf(it), mutableSetOf())
         }
 
         logDistanceToEnemyGrid()
+    }
+
+    fun randomWalk(loc: Location): Int {
+        return (0 until 150).map {
+            val visited = mutableSetOf(loc)
+            var curr = loc
+            var i = 0
+            var terminated = false
+            var avg = visited.map { it.site().resource() }.average()
+            var minAvg = avg
+
+            while (i < 15 && !terminated) {
+                val ns = curr.neighbors().filter { !it.loc.site().isMine() && it.loc !in visited }
+                if (ns.isEmpty()) {
+                    terminated = true
+                } else {
+                    val chosen = ns[Random().nextInt(ns.size)]
+
+                    if (!chosen.loc.site().isEnvironment() || chosen.loc.site().strength == 0) {
+                        terminated = true
+                    } else {
+                        visited.add(chosen.loc)
+                        curr = chosen.loc
+                    }
+                }
+
+                avg = visited.map { it.site().resource() }.average()
+                if (avg < minAvg) minAvg = avg
+                i++
+            }
+
+            minAvg
+        }.plus(loc.site().resource().toDouble()).min()?.toInt() ?: loc.site().resource()
     }
 
     fun walkGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>): Boolean {
@@ -154,6 +198,40 @@ object MyBot {
                         ((source.site().strength == 255 && this.site().strength < 255) ||
                                 this.site().strength + 15 < source.site().strength)
 
+        fun updateNextMap(move: Move) {
+            val source = move.loc
+            val target = move.loc.move(move.dir)
+
+            val originSite = gameMap.getSite(source)
+            val targetSite = gameMap.getSite(target)
+            val startSite = nextMap.getSite(source)
+            val destinationSite = nextMap.getSite(target)
+
+            if (startSite.owner == destinationSite.owner) {
+                if (move.dir == Direction.STILL) {
+                    destinationSite.strength += destinationSite.production
+                } else {
+                    startSite.strength -= originSite.strength
+                    destinationSite.strength += originSite.strength
+                }
+            } else {
+                startSite.strength -= originSite.strength
+
+                if (target !in destinations) {
+                    destinationSite.strength = 0
+                }
+
+                if (targetSite.strength <= originSite.strength) {
+                    targetSite.strength = 0
+                    destinationSite.strength += originSite.strength
+                    destinationSite.owner = originSite.owner
+                } else {
+                    targetSite.strength -= originSite.strength
+                    destinationSite.strength += originSite.strength
+                }
+            }
+        }
+
         fun finalizeMove(source: Location, target: Location, blackout: Boolean) {
             if (target.swappable(source) &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
@@ -198,6 +276,28 @@ object MyBot {
             }
         }
 
+//        fun allCombos(locs: List<RelativeLocation>): List<List<RelativeLocation>> {
+//            val combos = mutableListOf<List<RelativeLocation>>()
+//
+//            (0 until locs.size).forEach { a ->
+//                combos.add(listOf(locs[a]))
+//
+//                ((a + 1) until locs.size).forEach { b ->
+//                    combos.add(listOf(locs[a], locs[b]))
+//
+//                    ((b + 1) until locs.size).forEach { c ->
+//                        combos.add(listOf(locs[a], locs[b], locs[c]))
+//
+//                        ((c + 1) until locs.size).forEach { d ->
+//                            combos.add(listOf(locs[a], locs[b], locs[c], locs[d]))
+//                        }
+//                    }
+//                }
+//            }
+//
+//            return combos
+//        }
+
         points
                 .filter { it.site().isMine() && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.loc.site().isEnvironment() && it.loc.site().strength == 0 } }
@@ -220,6 +320,28 @@ object MyBot {
 
                     finalizeMove(loc, target, true)
                 }
+//
+//        points
+//                .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+//                .sortedBy { distanceToEnemyGrid[it.y][it.x] }
+//                .forEach { loc ->
+//                    val wouldAttack = loc.neighbors()
+//                            .filter { it.loc.site().isMine() && it.loc !in sources && it.loc.site().strength > 0 }
+//                            .filter { distanceToEnemyGrid[it.loc.y][it.loc.x] > distanceToEnemyGrid[loc.y][loc.x] }
+//                            .filter { it.loc.site().production > 0 && (it.loc.site().strength - loc.site().strength) / it.loc.site().production > 3 }
+//
+//                    allCombos(wouldAttack)
+//                            .sortedWith(compareBy({ it.size }, { it.map { it.loc.site().strength }.sum() }))
+//                            .filter {
+//                                val sum = it.sumBy { it.loc.site().strength }
+//                                sum > loc.site().strength && sum < MAXIMUM_STRENGTH
+//                            }
+//                            .firstOrNull()
+//                            ?.forEach {
+//
+//                                finalizeMove(it.loc, loc, true)
+//                            }
+//                }
 
         points
                 .filter { it.site().isMine() && it !in sources }
@@ -239,11 +361,10 @@ object MyBot {
                                             nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH
                                 } else if (nextSite.isEnvironment()) {
                                     // environment
-                                    nextSite.strength < loc.site().strength
+                                    it.loc.site().strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * 5,
-                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())) &&
+                                    loc.site().strength > Math.max(loc.site().production * 5, MINIMUM_STRENGTH * 2) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.loc.swappable(loc))
                                 }
                             }
@@ -261,34 +382,6 @@ object MyBot {
                 }
     }
 
-    fun updateNextMap(move: Move) {
-        val source = move.loc
-        val target = move.loc.move(move.dir)
-
-        val originSite = gameMap.getSite(source)
-        val startSite = nextMap.getSite(source)
-        val destinationSite = nextMap.getSite(target)
-
-        if (startSite.owner == destinationSite.owner) {
-            if (move.dir == Direction.STILL) {
-                destinationSite.strength += destinationSite.production
-            } else {
-                startSite.strength -= originSite.strength
-                destinationSite.strength += originSite.strength
-            }
-        } else {
-            startSite.strength -= originSite.strength
-            if (destinationSite.strength <= originSite.strength) {
-                destinationSite.strength = originSite.strength - destinationSite.strength
-                destinationSite.owner = originSite.owner
-            } else {
-                destinationSite.strength -= originSite.strength
-            }
-        }
-
-        if (destinationSite.strength > 255) destinationSite.strength = 255
-    }
-
     // EXTENSIONS METHODS
 
     // SITE
@@ -300,28 +393,18 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.overkill() =
-            if (this.isEnvironment() && this.strength > 0) {
+            if (this.isMine() || (this.isEnvironment() && this.strength > 0)) {
                 -distanceToEnemyGrid[this.loc.y][this.loc.x]
             } else {
                 this.loc.neighbors()
                         .map {
                             if (it.loc.site().isOtherPlayer()) it.loc.site().strength + it.loc.site().production
-                            else if (nextMap.getSite(it.loc).isMine()) it.loc.allNeighborsWithin(2)
-                                    .filter { it.site().isMine() }
-                                    .map { -nextMap.getSite(it).strength }
-                                    .sum()
                             else 0
                         }.sum()
             }
 
     fun Site.resource() = if (!this.isMine()) {
-        (this.loc.neighbors()
-                .filter { it.loc.site().isEnvironment() && it.loc.site().strength > 0 && it.loc.site().production > 0 }
-                .map {
-                    (it.loc.site().strength / (it.loc.site().production + stillMax).toDouble())
-                }
-                .average() + (this.strength / (this.production + stillMax).toDouble()))
-                .toInt() / 2
+        (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
 
