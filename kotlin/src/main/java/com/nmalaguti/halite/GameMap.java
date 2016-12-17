@@ -1,10 +1,13 @@
 package com.nmalaguti.halite;
 
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-public class GameMap{
-    public ArrayList< ArrayList<Site> > contents;
+public class GameMap implements Iterable<Location> {
+    public ArrayList<ArrayList<Site>> contents;
     public int width, height;
+    public ArrayList<ArrayList<Integer>> productions;
 
     public GameMap() {
         width = 0;
@@ -98,5 +101,37 @@ public class GameMap{
 
     public Site getSite(Location loc) {
         return contents.get(loc.getY()).get(loc.getX());
+    }
+
+    @Override
+    public Iterator<Location> iterator() {
+        return new GameMapIterator(this);
+    }
+
+    public static class GameMapIterator implements Iterator<Location> {
+
+        private GameMap gameMap;
+        private int i = 0;
+
+        GameMapIterator(GameMap gameMap) {
+            this.gameMap = gameMap;
+        }
+
+        @Override
+        public boolean hasNext() {
+            int y = (i + 1) / gameMap.width;
+            return y < gameMap.height;
+        }
+
+        @Override
+        public Location next() {
+            i++;
+            int y = i / gameMap.width;
+            int x = i % gameMap.width;
+
+            if (y >= gameMap.height) throw new NoSuchElementException();
+
+            return new Location(x, y);
+        }
     }
 }

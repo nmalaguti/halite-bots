@@ -1,8 +1,9 @@
 package com.nmalaguti.halite
 
+import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyNimbleBot"
+val BOT_NAME = "MyDynamicBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -23,59 +24,118 @@ object MyBot {
     var territory: Int = 0
     var border: Int = 0
     var madeContact: Boolean = false
+    var numPlayers: Int = 0
 
-    fun init() {
-        val init = Networking.getInit()
-        gameMap = init.gameMap
-        id = init.myID
-        points = permutations(gameMap)
+    var resourceStrategy: ResourceStrategy = ResourceStrategy.Pure
+    var growthStrategy: GrowthStrategy = GrowthStrategy.Static
 
-        logger.info("id: $id")
-
-        Networking.sendInit(BOT_NAME)
-    }
-
-    fun endGameLoop() {
-        Networking.sendFrame(allMoves)
-    }
 
     @Throws(java.io.IOException::class)
     @JvmStatic fun main(args: Array<String>) {
         initializeLogging()
         init()
 
-        // game loop
         while (true) {
-            // get frame
-            gameMap = Networking.getFrame()
-            nextMap = GameMap(gameMap)
+            gameLoop(Networking.getFrame())
+            Networking.sendFrame(allMoves)
+        }
+    }
 
-            start = System.currentTimeMillis()
-            logger.info("===== Turn: ${turn++} at $start =====")
+    fun init() {
+        val init = Networking.getInit()
+        gameMap = init.gameMap
+        id = init.myID
+        points = permutations(gameMap)
+        numPlayers = gameMap.groupBy { gameMap.getSite(it).owner }.keys.size
 
-            lastTurnMoves = allMoves.associateBy { it.loc }
-            playerStats = playerStats()
+        logger.info("id: $id")
 
-            // reset all moves
+        // 15 seconds to test out which behavior will work best
+        preprocess()
+
+        logger.info("resource strategy: $resourceStrategy")
+        logger.info("growth strategy: $growthStrategy")
+
+        turn = 0
+        allMoves = mutableSetOf()
+        stillMax = 0
+        madeContact = false
+
+        Networking.sendInit(BOT_NAME)
+    }
+
+    fun preprocess() {
+        val preprocessStart = System.currentTimeMillis()
+
+        val initialGameMap = GameMap(gameMap)
+        val strategies = mutableListOf(
+                ResourceStrategy.Pure to GrowthStrategy.StaticWithMinumum,
+                ResourceStrategy.Average to GrowthStrategy.StaticWithMinumum,
+                ResourceStrategy.Pure to GrowthStrategy.DynamicWithMinimum,
+                ResourceStrategy.Average to GrowthStrategy.DynamicWithMinimum
+        ).shuffle()
+
+        val results = mutableListOf<Pair<Stats, Pair<ResourceStrategy, GrowthStrategy>>>()
+
+        strategies.forEach strats@ {
+            resourceStrategy = it.first
+            growthStrategy = it.second
+
+            turn = 0
             allMoves = mutableSetOf()
-
-            buildDistanceToEnemyGrid()
-
             stillMax = 0
-            territory = points.filter { it.site().isMine() }.size
-            border = points.filter { it.isInnerBorder() }.size
+            madeContact = false
+            gameMap = GameMap(initialGameMap)
 
-            if (points.any { it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isMine() }}) {
-                madeContact = true
+            (0 until 50).forEach {
+                if (System.currentTimeMillis() - preprocessStart > 14000) return@strats
+
+                val startGameMap = GameMap(gameMap)
+                gameLoop(startGameMap)
+                gameMap = processFrame(startGameMap, allMoves, numPlayers)
             }
 
-            makeBattleMoves()
-
-            logger.info("stillMax: $stillMax")
-            logger.info("additive: ${(territory / border.toDouble()).toInt()}")
-
-            endGameLoop()
+            playerStats()
+            results.add(playerStats[id]!! to it)
         }
+
+        results.sortWith(compareBy({ -it.first.production }))
+
+        logger.info(results.map { "${it.second}: str(${it.first.strength}) prd(${it.first.production}) ter(${it.first.territory})" }.joinToString("\n"))
+
+        results.firstOrNull()?.let {
+            resourceStrategy = it.second.first
+            growthStrategy = it.second.second
+        }
+    }
+
+    fun gameLoop(map: GameMap) {
+        // get frame
+        gameMap = map
+        nextMap = GameMap(gameMap)
+
+        start = System.currentTimeMillis()
+        logger.info("===== Turn: ${turn++} at $start =====")
+
+        lastTurnMoves = allMoves.associateBy { it.loc }
+        playerStats = playerStats()
+
+        // reset all moves
+        allMoves = mutableSetOf()
+        territory = points.filter { it.site().isMine() }.size
+        border = points.filter { it.isInnerBorder() }.size
+        if (points.any { it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isMine() }}) {
+            madeContact = true
+        }
+
+        buildDistanceToEnemyGrid()
+
+        stillMax = 0
+
+        makeBattleMoves()
+
+        logger.info("stillMax: $stillMax")
+        logger.info("additive: ${(territory / border.toDouble()).toInt()}")
     }
 
     // MOVE LOGIC
@@ -286,7 +346,7 @@ object MyBot {
 
         points
                 .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                .sortedWith(compareBy({ -it.site().strength }, { distanceToEnemyGrid[it.y][it.x] }))
+                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
                 .forEach { loc ->
                     val wouldAttack = loc.neighbors()
                             .filter { it.site().isMine() && it !in sources && it.site().strength > it.site().production * 2 }
@@ -325,7 +385,7 @@ object MyBot {
                                     it.site().strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * multiplier(loc), if (madeContact) 2 * MINIMUM_STRENGTH else 0) &&
+                                    loc.site().strength > growthLimit(it) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -344,6 +404,17 @@ object MyBot {
     }
 
     // EXTENSIONS METHODS
+
+    fun <T> List<T>.shuffle(): List<T> {
+        val copy = this.toMutableList()
+        ((copy.size - 1) downTo 1).forEach { i ->
+            val j = Random().nextInt(i + 1)
+            val temp = copy[i]
+            copy[i] = copy[j]
+            copy[j] = temp
+        }
+        return copy.toList()
+    }
 
     // SITE
 
@@ -368,21 +439,32 @@ object MyBot {
                         }.sum()
             }
 
-//    fun Site.resource() = if (!this.isMine()) {
-//        (this.loc.neighbors()
-//                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
-//                .map {
-//                    (it.site().strength / (it.site().production + stillMax).toDouble())
-//                }
-//                .average() + (this.strength / (this.production + stillMax).toDouble()))
-//                .toInt() / 2
-//    }
-//    else 9999
+    enum class ResourceStrategy {
+        Average,
+        Pure
+    }
 
-    fun Site.resource() = if (!this.isMine()) {
-        (this.strength / (this.production + stillMax).toDouble()).toInt()
+    fun Site.averageResource() = if (!this.isMine()) {
+        (this.loc.neighbors()
+                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
+                .map {
+                    (it.site().strength / (it.site().production + stillMax).toDouble())
+                }
+                .average() + (this.strength / (this.production + stillMax).toDouble()))
+                .toInt() / 2
     }
     else 9999
+
+    fun Site.pureResource() = if (!this.isMine()) {
+        if (this.production == 0) Int.MAX_VALUE
+        else (this.strength / (this.production + stillMax).toDouble()).toInt()
+    }
+    else 9999
+
+    fun Site.resource() = when(resourceStrategy) {
+        ResourceStrategy.Pure -> this.pureResource()
+        ResourceStrategy.Average -> this.averageResource()
+    }
 
     // LOCATION
 
@@ -431,12 +513,6 @@ object MyBot {
             .groupBy { it.owner }
             .mapValues { Stats(it.value.size, it.value.sumBy { it.production }, it.value.sumBy { it.strength }) }
 
-    // CLASSES
-
-    class RelativeLocation(val origin: Location, val direction: Direction) {
-        val loc: Location = origin.move(direction)
-    }
-
     // HELPER METHODS
 
     fun permutations(first: IntRange, second: IntRange) =
@@ -464,7 +540,169 @@ object MyBot {
 
     fun log2(num: Double) = Math.log10(num) / Math.log10(2.0)
 
-    fun multiplier(loc: Location) =
+    enum class GrowthStrategy {
+        Dynamic,
+        DynamicWithMinimum,
+        Static,
+        StaticWithMinumum
+    }
+
+    fun growthLimit(loc: Location) = when (growthStrategy) {
+        GrowthStrategy.Dynamic -> loc.site().production * dynamicMultiplier(loc)
+        GrowthStrategy.DynamicWithMinimum -> Math.max(loc.site().production * dynamicMultiplier(loc), if (madeContact) MINIMUM_STRENGTH * 2 else 0)
+        GrowthStrategy.Static -> loc.site().production * 5
+        GrowthStrategy.StaticWithMinumum -> Math.max(loc.site().production * 5, MINIMUM_STRENGTH * 2)
+    }
+
+    fun dynamicMultiplier(loc: Location) =
             Math.max(1, Math.min(5.0, log2(distanceToEnemyGrid[loc.y][loc.x].toDouble() * if (madeContact) 3.0 else 1.5)).toInt())
-//    fun multiplier(loc: Location) = 5
+}
+
+fun processFrame(initialMap: GameMap, submittedMoves: Collection<Move>, numPlayers: Int): GameMap {
+    val gameMap = GameMap(initialMap)
+    val width = gameMap.width
+    val height = gameMap.height
+
+    val moves = (0 until height)
+            .map {
+                (0 until width).map { Direction.STILL }.toMutableList()
+            }
+            .toMutableList()
+
+    submittedMoves.forEach {
+        moves[it.loc.y][it.loc.x] = it.dir
+    }
+
+    val pieces = (0 until numPlayers)
+            .map {
+                (0 until height)
+                        .map {
+                            (0 until width).map { null as Int? }.toMutableList()
+                        }
+                        .toMutableList()
+            }
+            .toMutableList()
+
+    (0 until numPlayers).forEach {
+        pieces.add(mutableListOf())
+    }
+
+    (0 until height).forEach y@ { y ->
+        (0 until width).forEach x@ { x ->
+            val direction = moves[y][x]
+            val cell = gameMap.contents[y][x]
+            val player = cell.owner - 1
+            val production = cell.production
+
+            if (cell.owner == 0) return@x
+
+            if (direction == Direction.STILL) {
+                if (cell.strength + production <= 255) cell.strength += cell.production
+                else cell.strength = 255
+            }
+
+            val newLoc = gameMap.getLocation(Location(x, y), direction)
+            if (pieces[player][newLoc.y][newLoc.x] != null) {
+                if (pieces[player][newLoc.y][newLoc.x]!! + cell.strength <= 255)
+                    pieces[player][newLoc.y][newLoc.x] = pieces[player][newLoc.y][newLoc.x]?.plus(cell.strength)
+                else pieces[player][newLoc.y][newLoc.x] = 255
+            } else {
+                pieces[player][newLoc.y][newLoc.x] = cell.strength
+            }
+
+            if (pieces[player][y][x] == null) {
+                pieces[player][y][x] = 0
+            }
+
+            gameMap.contents[y][x] = Site(0, gameMap.contents[y][x].production, 0, Location(x, y))
+        }
+    }
+
+    val toInjure = (0 until numPlayers)
+            .map {
+                (0 until height)
+                        .map {
+                            (0 until width).map { null as Int? }.toMutableList()
+                        }
+                        .toMutableList()
+            }
+            .toMutableList()
+
+    val injureMap = (0 until height)
+            .map {
+                (0 until width).map { 0 }.toMutableList()
+            }
+            .toMutableList()
+
+
+    (0 until height).forEach y@ { y ->
+        (0 until width).forEach x@ { x ->
+            (0 until numPlayers).forEach p@ { p ->
+                if (pieces[p][y][x] != null) {
+                    (0 until numPlayers).forEach q@ { q ->
+                        if (p != q) {
+                            Direction.DIRECTIONS.forEach { dir ->
+                                val loc = gameMap.getLocation(Location(x, y), dir)
+
+                                if (pieces[q][loc.y][loc.x] != null) {
+                                    if (toInjure[q][loc.y][loc.x] != null) {
+                                        toInjure[q][loc.y][loc.x] = toInjure[q][loc.y][loc.x]?.plus(pieces[p][y][x]!!)
+                                    } else {
+                                        toInjure[q][loc.y][loc.x] = pieces[p][y][x]
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (gameMap.contents[y][x].strength > 0) {
+                        if (toInjure[p][y][x] != null) {
+                            toInjure[p][y][x] = toInjure[p][y][x]?.plus(gameMap.contents[y][x].strength)
+                        } else {
+                            toInjure[p][y][x] = gameMap.contents[y][x].strength
+                        }
+                        injureMap[y][x] += pieces[p][y][x]!!
+                    }
+                }
+            }
+        }
+    }
+
+    (0 until numPlayers).forEach p@ { p ->
+        (0 until height).forEach y@ { y ->
+            (0 until width).forEach x@ { x ->
+                if (toInjure[p][y][x] != null) {
+                    if (toInjure[p][y][x]!! >= pieces[p][y][x] ?: 0) {
+                        pieces[p][y][x] = null
+                    } else {
+                        pieces[p][y][x] = pieces[p][y][x]?.minus(toInjure[p][y][x]!!)
+                    }
+                }
+            }
+        }
+    }
+
+    (0 until height).forEach y@ { y ->
+        (0 until width).forEach x@ { x ->
+            if (gameMap.contents[y][x].strength < injureMap[y][x]) {
+                gameMap.contents[y][x].strength = 0
+            } else {
+                gameMap.contents[y][x].strength -= injureMap[y][x]
+            }
+            gameMap.contents[y][x].owner = 0
+        }
+    }
+
+    (0 until numPlayers).forEach p@ { p ->
+        (0 until height).forEach y@ { y ->
+            (0 until width).forEach x@ { x ->
+                if (pieces[p][y][x] != null) {
+                    gameMap.contents[y][x].owner = p + 1
+                    gameMap.contents[y][x].strength = pieces[p][y][x]!!
+                }
+            }
+        }
+    }
+
+    return GameMap(gameMap)
 }
