@@ -1,9 +1,8 @@
 package com.nmalaguti.halite
 
-import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShortWalkBot"
+val BOT_NAME = "MyNimbleBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -91,55 +90,11 @@ object MyBot {
             distanceToEnemyGrid.add(row)
         }
 
-        // update outer border based on random walks?
-        points
-                .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                .map { it to directedWalk(it) }
-                .forEach {
-                    val (loc, value) = it
-                    distanceToEnemyGrid[loc.y][loc.x] = value
-                }
-
         points.filter { it.isOuterBorder() }.sortedBy { distanceToEnemyGrid[it.y][it.x] }.take(20).forEach {
             walkGridFrom(mutableSetOf(it), mutableSetOf())
         }
 
         logDistanceToEnemyGrid()
-    }
-
-    fun directedWalk(loc: Location): Int {
-        val locToValue = mutableMapOf<Location, Double>()
-        var minAvg: Double = loc.site().resource().toDouble()
-        var queue = ArrayDeque<Location>()
-        queue.addFirst(loc)
-        locToValue[loc] = minAvg
-        val visited = mutableSetOf<Location>()
-
-        while (queue.isNotEmpty()) {
-            val currLoc = queue.removeFirst()
-
-            if (currLoc in visited) continue
-            visited.add(currLoc)
-
-            val dist = gameMap.getDistance(currLoc, loc)
-
-            if (dist > 2) continue
-
-            val currAvg = locToValue[currLoc] ?: minAvg
-
-            if (currAvg < minAvg) minAvg = currAvg
-
-            currLoc.neighbors()
-                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                    .forEach {
-                        val nextValue = currAvg - ((currAvg - it.site().resource().toDouble()) / ((dist + 3)))
-                        val currValue = locToValue.getOrPut(it, { nextValue })
-                        if (nextValue < currValue) locToValue[it] = nextValue
-                        queue.addLast(it)
-                    }
-        }
-
-        return minAvg.toInt()
     }
 
     fun walkGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>): Boolean {
@@ -363,14 +318,14 @@ object MyBot {
 
                                 if (nextSite.isEnvironment() && nextSite.strength == 0) {
                                     // enemy space
-                                    loc.site().strength > loc.site().production * multiplier(loc) &&
+                                    loc.site().strength > loc.site().production * 2 &&
                                             nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH
                                 } else if (nextSite.isEnvironment()) {
                                     // environment
                                     it.site().strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > loc.site().production * multiplier(loc) &&
+                                    loc.site().strength > Math.max(loc.site().production * multiplier(loc), if (madeContact) 2 * MINIMUM_STRENGTH else 0) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -412,6 +367,17 @@ object MyBot {
                             else 0
                         }.sum()
             }
+
+//    fun Site.resource() = if (!this.isMine()) {
+//        (this.loc.neighbors()
+//                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
+//                .map {
+//                    (it.site().strength / (it.site().production + stillMax).toDouble())
+//                }
+//                .average() + (this.strength / (this.production + stillMax).toDouble()))
+//                .toInt() / 2
+//    }
+//    else 9999
 
     fun Site.resource() = if (!this.isMine()) {
         (this.strength / (this.production + stillMax).toDouble()).toInt()
@@ -498,6 +464,7 @@ object MyBot {
 
     fun log2(num: Double) = Math.log10(num) / Math.log10(2.0)
 
-    fun multiplier(loc: Location) = Math.max(1, Math.min(5.0, log2(distanceToEnemyGrid[loc.y][loc.x].toDouble() * 1.5)).toInt())
+    fun multiplier(loc: Location) =
+            Math.max(1, Math.min(5.0, log2(distanceToEnemyGrid[loc.y][loc.x].toDouble() * if (madeContact) 3.0 else 1.5)).toInt())
 //    fun multiplier(loc: Location) = 5
 }
