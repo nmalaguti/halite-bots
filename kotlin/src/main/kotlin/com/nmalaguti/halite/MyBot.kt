@@ -14,10 +14,9 @@ object MyBot {
     lateinit var nextMap: GameMap
     var id: Int = 0
     var turn: Int = 0
-    lateinit var points: List<Location>
-    var allMoves = mutableSetOf<Move>()
+    var allMoves = mutableMapOf<Location, Direction>()
     var start = System.currentTimeMillis()
-    var lastTurnMoves: Map<Location, Move> = mapOf()
+    var lastTurnMoves: Map<Location, Direction> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
     var stillMax: Int = 0
@@ -38,18 +37,26 @@ object MyBot {
 
         while (true) {
             gameLoop(Networking.getFrame())
-            Networking.sendFrame(allMoves)
+            Networking.sendFrame(sendMoves())
         }
+    }
+
+    fun reset() {
+        turn = 0
+        allMoves = mutableMapOf()
+        stillMax = 0
+        madeContact = false
     }
 
     fun init() {
         val init = Networking.getInit()
         gameMap = init.gameMap
         id = init.myID
-        points = permutations(gameMap)
-        numPlayers = gameMap.groupBy { gameMap.getSite(it).owner }.keys.size
+
+        numPlayers = gameMap.map { gameMap.getSite(it).owner }.filter { it > 0 }.toSet().size
 
         logger.info("id: $id")
+        logger.info("numPlayers: $numPlayers")
 
         // 15 seconds to test out which behavior will work best
         preprocess()
@@ -57,10 +64,7 @@ object MyBot {
         logger.info("resource strategy: $resourceStrategy")
         logger.info("growth strategy: $growthStrategy")
 
-        turn = 0
-        allMoves = mutableSetOf()
-        stillMax = 0
-        madeContact = false
+        reset()
 
         Networking.sendInit(BOT_NAME)
     }
@@ -82,10 +86,8 @@ object MyBot {
             resourceStrategy = it.first
             growthStrategy = it.second
 
-            turn = 0
-            allMoves = mutableSetOf()
-            stillMax = 0
-            madeContact = false
+            reset()
+
             gameMap = GameMap(initialGameMap)
 
             (0 until 50).forEach {
@@ -93,7 +95,7 @@ object MyBot {
 
                 val startGameMap = GameMap(gameMap)
                 gameLoop(startGameMap)
-                gameMap = processFrame(startGameMap, allMoves, numPlayers)
+                gameMap = processFrame(startGameMap, sendMoves(), numPlayers)
             }
 
             playerStats()
@@ -118,22 +120,20 @@ object MyBot {
         start = System.currentTimeMillis()
         logger.info("===== Turn: ${turn++} at $start =====")
 
-        lastTurnMoves = allMoves.associateBy { it.loc }
+        lastTurnMoves = allMoves
         playerStats = playerStats()
 
         // reset all moves
-        allMoves = mutableSetOf()
-        territory = points.filter { it.site().isMine() }.size
-        border = points.filter { it.isInnerBorder() }.size
-        if (points.any { it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isMine() }}) {
+        allMoves = mutableMapOf()
+        territory = gameMap.filter { it.site().isMine() }.size
+        border = gameMap.filter { it.isInnerBorder() }.size
+        if (gameMap.any { it.site().isCombat() && it.neighbors().any { it.site().isMine() }}) {
             madeContact = true
         }
 
         buildDistanceToEnemyGrid()
 
         makeBattleMoves()
-
-        stillMax = allMoves.filter { it.loc.site().strength == 255 && it.dir == Direction.STILL }.size
 
         logger.info("stillMax: $stillMax")
         logger.info("additive: ${(territory / border.toDouble()).toInt()}")
@@ -142,49 +142,77 @@ object MyBot {
     // MOVE LOGIC
 
     fun buildDistanceToEnemyGrid() {
-        distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
-        for (y in 0 until gameMap.height) {
-            val row = mutableListOf<Int>()
-            for (x in 0 until gameMap.width) {
-                row.add(Location(x, y).site().resource())
-            }
-            distanceToEnemyGrid.add(row)
-        }
+         mutableListOf<MutableList<Int>>()
 
-        val distanceFromCombat = mutableListOf<MutableList<Int>>()
+        distanceToEnemyGrid = (0 until gameMap.height)
+                .map { y ->
+                    (0 until gameMap.width)
+                            .map { x -> Location(x, y).site().resource() }
+                            .toMutableList()
+                }
+                .toMutableList()
 
-        for (y in 0 until gameMap.height) {
-            val row = mutableListOf<Int>()
-            for (x in 0 until gameMap.width) {
-                val loc = Location(x, y)
-                if (loc.site().isEnvironment() && loc.site().strength == 0) row.add(0)
-                else row.add(9999)
-            }
-            distanceFromCombat.add(row)
-        }
+        val distanceFromCombat = (0 until gameMap.height)
+                .map { y ->
+                    (0 until gameMap.width)
+                            .map { x ->
+                                val loc = Location(x, y)
+
+                                if (loc.site().isCombat()) 0
+                                else 9999
+                            }
+                            .toMutableList()
+                }
+                .toMutableList()
 
         walkCombatGrid(distanceFromCombat)
 
-        val counted = mutableSetOf<Location>()
+        val collected = mutableSetOf<Location>()
 
-        points
-                .filter { it.site().isEnvironment() && it.site().strength == 0 }
+        gameMap
+                .filter { it.site().isCombat() }
+                .map {
+                    if (it in collected) null
+                    else {
+                        val sphere = walkToDrop(it, distanceFromCombat)
+                        collected.addAll(sphere)
+                        it to sphere.partition { it.site().isMine() }
+                    }
+                }
+                .filterNotNull()
                 .forEach {
-                    if (it in counted) return@forEach
+                    val loc = it.first
+                    val (mine, enemies) = it.second
 
-                    val sphereOfInfluence = walkToDrop(it, distanceFromCombat)
+                    val myStrength = mine.map { it.site().strength }.sum()
+                    val enemyStrength = enemies.map { it.site().strength }.sum()
 
-                    val count255 = sphereOfInfluence.filter { it.site().strength == 255 }.size
+                    logger.info("strength around $loc: $myStrength | $enemyStrength")
 
-                    distanceToEnemyGrid[it.y][it.x] = count255
-                    it.neighbors()
-                            .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                            .forEach { distanceToEnemyGrid[it.y][it.x] -= count255 }
+                    distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, (myStrength - enemyStrength) / 255)
+
+//                    if (myStrength > enemyStrength) {
+////                        // find a place to tunnel
+////                        val tunnelPoint = mine
+////                                .filter { it.isInnerBorder() }
+////                                .map { tunnel(it) }
+////                                .filterNotNull()
+////                                .filter { it.first.site().isEnvironment() }
+////                                .sortedBy { it.second }
+////                                .firstOrNull()?.first
+//
+//                        mine
+//                                .filter { it.isInnerBorder() }
+//                                .flatMap { it.neighbors() }
+//                                .filter { it.isOuterBorder() && it.site().isEnvironment() }
+//                                .minBy { distanceToEnemyGrid[it.y][it.x] }
+//                                ?.let { distanceToEnemyGrid[it.y][it.x] = 0 }
+//                    }
                 }
 
         if (enableDirectedWalk) {
-            points
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+            gameMap
+                    .filter { it.isOuterBorder() && it.site().isEnvironment() }
                     .map { it to directedWalk(it) }
                     .forEach {
                         val (loc, value) = it
@@ -193,17 +221,37 @@ object MyBot {
         }
 
 
-        points.filter { it.isOuterBorder() }.sortedBy { distanceToEnemyGrid[it.y][it.x] }.take(20).forEach {
+        gameMap.filter { it.isOuterBorder() }.sortedBy { distanceToEnemyGrid[it.y][it.x] }.take(20).forEach {
             walkGridFrom(mutableSetOf(it), mutableSetOf())
         }
 
         logGrid(distanceToEnemyGrid)
     }
 
+    fun tunnel(loc: Location) =
+            Direction.CARDINALS
+                    .filter { loc.move(it).site().isEnvironment() }
+                    .map {
+                        var curr = loc.move(it)
+                        var distance = curr.site().strength
+
+                        while (curr.site().isEnvironment()) {
+                            curr = curr.move(it)
+                            distance += curr.site().strength
+                        }
+
+                        if (curr.site().isOtherPlayer()) {
+                            loc.move(it) to distance
+                        } else null
+                    }
+                    .filterNotNull()
+                    .sortedBy { it.second }
+                    .firstOrNull()
+
     fun directedWalk(loc: Location): Int {
         val locToValue = mutableMapOf<Location, Double>()
         var minAvg: Double = loc.site().resource().toDouble()
-        var queue = ArrayDeque<Location>()
+        val queue = ArrayDeque<Location>()
         queue.addFirst(loc)
         locToValue[loc] = minAvg
         val visited = mutableSetOf<Location>()
@@ -223,7 +271,7 @@ object MyBot {
             if (currAvg < minAvg) minAvg = currAvg
 
             currLoc.neighbors()
-                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                    .filter { it.site().isEnvironment() }
                     .forEach {
                         val nextValue = currAvg - ((currAvg - it.site().resource().toDouble()) / ((dist + 2)))
                         val currValue = locToValue.getOrPut(it, { nextValue })
@@ -237,8 +285,21 @@ object MyBot {
 
     fun walkToDrop(loc: Location, grid: MutableList<MutableList<Int>>): Collection<Location> {
         var maxSeen = 0
-        val toVisit = mutableSetOf(loc)
+        val startingSet = mutableSetOf(loc)
+        val toVisit = mutableSetOf<Location>(loc)
         val visited = mutableSetOf<Location>()
+
+        while (startingSet.isNotEmpty()) {
+            val current = startingSet.first()
+            startingSet.remove(current)
+            if (current !in toVisit) {
+                toVisit.add(current)
+
+                current.neighbors()
+                        .filter { grid[it.y][it.x] <= 2 }
+                        .forEach { startingSet.add(it) }
+            }
+        }
 
         while (toVisit.isNotEmpty()) {
             val current = toVisit.first()
@@ -246,10 +307,8 @@ object MyBot {
             if (current !in visited) {
                 visited.add(current)
 
-                if (grid[current.y][current.x] > maxSeen) maxSeen = grid[current.y][current.x]
-
                 current.neighbors()
-                        .filter { it.site().isMine() && grid[it.y][it.x] >= maxSeen }
+                        .filter { !it.site().isEnvironment() && (grid[it.y][it.x] <= 2 || grid[it.y][it.x] >= grid[current.y][current.x]) }
                         .forEach { toVisit.add(it) }
             }
         }
@@ -259,7 +318,7 @@ object MyBot {
 
     fun walkCombatGrid(distanceFromCombat: MutableList<MutableList<Int>>) {
         val openSet = mutableSetOf<Location>()
-        openSet.addAll(gameMap.filter { it.site().isEnvironment() && it.site().strength == 0 })
+        openSet.addAll(gameMap.filter { it.site().isCombat() })
 
         val closedSet = mutableSetOf<Location>()
 
@@ -269,7 +328,7 @@ object MyBot {
             if (current !in closedSet) {
                 closedSet.add(current)
 
-                if (current.site().isMine()) {
+                if (!current.site().isEnvironment()) {
                     distanceFromCombat[current.y][current.x] =
                             Math.min(
                                     distanceFromCombat[current.y][current.x],
@@ -278,7 +337,7 @@ object MyBot {
                 }
 
                 current.neighbors()
-                        .filter { it.site().isMine() }
+                        .filter { !current.site().isEnvironment() }
                         .forEach { openSet.add(it) }
             }
         }
@@ -294,7 +353,7 @@ object MyBot {
             if (current !in closedSet) {
                 closedSet.add(current)
 
-                if (current.site().isMine()) {
+                if (current.site().isMine() || current.site().isCombat()) {
                     val prevValue = distanceToEnemyGrid[current.y][current.x]
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
@@ -308,7 +367,7 @@ object MyBot {
                 }
 
                 current.neighbors()
-                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                        .filterNot { it.site().isEnvironment() }
                         .forEach { openSet.add(it) }
             }
         }
@@ -393,8 +452,8 @@ object MyBot {
                 updateNextMap(move1)
                 updateNextMap(move2)
 
-                allMoves.add(move1)
-                allMoves.add(move2)
+                makeMove(move1)
+                makeMove(move2)
 
                 sources.put(source, move1.dir)
                 sources.put(target, move2.dir)
@@ -404,8 +463,8 @@ object MyBot {
                 var move = moveTowards(source, target)
 
                 if (!blackout) {
-                    val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
-                    if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
+                    val moveFromDestination = lastTurnMoves[target]
+                    if (moveFromDestination != null && target.move(moveFromDestination) == source) {
                         move = Move(source, Direction.STILL)
                     }
 
@@ -414,7 +473,7 @@ object MyBot {
                     }
                 }
 
-                allMoves.add(move)
+                makeMove(move)
 
                 if (target != source) {
                     blackoutCells.add(source)
@@ -463,7 +522,7 @@ object MyBot {
                         val targetSite = nextMap.getSite(target)
 
                         val valid =
-                                if (targetSite.isEnvironment() && targetSite.strength == 0) {
+                                if (targetSite.isCombat()) {
                                     // enemy space
                                     loc.site().strength > loc.site().production * 2 &&
                                             targetSite.strength + loc.site().strength < MAXIMUM_STRENGTH
@@ -480,11 +539,11 @@ object MyBot {
                         if (!valid || target in blackoutCells) target = loc
                     }
 
-                    finalizeMove(loc, target, target.site().isEnvironment() && target.site().strength == 0)
+                    finalizeMove(loc, target, target.site().isCombat())
                 }
 
-        points
-                .filter { it.isOuterBorder() && nextMap.getSite(it).isEnvironment() && nextMap.getSite(it).strength > 0 }
+        gameMap
+                .filter { it.isOuterBorder() && nextMap.getSite(it).isEnvironment() }
                 .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -504,7 +563,29 @@ object MyBot {
                                 finalizeMove(it, loc, true)
                             }
                 }
+
+//        allMoves
+//                .filter { it.key.site().strength == 255 && it.value == Direction.STILL }
+//                .forEach {
+//                    stillMax += 1
+//                    val loc = it.key
+//
+//                    val target = loc.neighbors()
+//                            .filter { it.swappable(loc) }
+//                            .shuffle()
+//                            .firstOrNull()
+//
+//                    if (target != null) {
+//                        finalizeMove(loc, target, false)
+//                    }
+//                }
     }
+
+    fun makeMove(move: Move) {
+        allMoves.put(move.loc, move.dir)
+    }
+
+    fun sendMoves() = allMoves.map { Move(it.key, it.value) }
 
     // EXTENSIONS METHODS
 
@@ -521,14 +602,16 @@ object MyBot {
 
     // SITE
 
-    fun Site.isOtherPlayer() = !this.isMine() && !this.isEnvironment()
+    fun Site.isOtherPlayer() = this.owner != id && this.owner > 0
 
-    fun Site.isEnvironment() = this.owner == 0
+    fun Site.isEnvironment() = this.owner == 0 && this.strength > 0
 
     fun Site.isMine() = this.owner == id
 
+    fun Site.isCombat() = this.owner == 0 && this.strength == 0
+
     fun Site.overkill() =
-            if (this.isEnvironment() && this.strength > 0) {
+            if (this.isEnvironment()) {
                 -distanceToEnemyGrid[this.loc.y][this.loc.x]
             } else {
                 this.loc.neighbors()
@@ -547,9 +630,9 @@ object MyBot {
         Pure
     }
 
-    fun Site.averageResource() = if (!this.isMine()) {
+    fun Site.averageResource() = if (!this.isMine() && !this.isCombat()) {
         (this.loc.neighbors()
-                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
+                .filter { it.site().isEnvironment() && it.site().production > 0 }
                 .map {
                     (it.site().strength / (it.site().production + stillMax).toDouble())
                 }
@@ -558,7 +641,7 @@ object MyBot {
     }
     else 9999
 
-    fun Site.pureResource() = if (!this.isMine()) {
+    fun Site.pureResource() = if (!this.isMine() && !this.isCombat()) {
         if (this.production == 0) Int.MAX_VALUE
         else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
@@ -583,10 +666,6 @@ object MyBot {
 
     fun Location.neighborsAndSelf() = Direction.DIRECTIONS.map { this.move(it) }
 
-    fun Location.enemies() = this.neighbors().filterNot { it.site().isMine() }
-
-    fun Location.friends() = this.neighbors().filter { it.site().isMine() }
-
     fun Location.move(direction: Direction) = gameMap.getLocation(this, direction)
 
     fun Location.site() = gameMap.getSite(this)
@@ -607,25 +686,16 @@ object MyBot {
         }.sortedBy { it.second }.first().first
     }
 
-    fun Location.allNeighborsWithin(distance: Int) = points.filter { gameMap.getDistance(it, this) <= distance }
+    fun Location.allNeighborsWithin(distance: Int) = gameMap.filter { gameMap.getDistance(it, this) <= distance }
 
     // GAMEMAP
 
-    fun playerStats() = points
+    fun playerStats() = gameMap
             .map { it.site() }
             .groupBy { it.owner }
             .mapValues { Stats(it.value.size, it.value.sumBy { it.production }, it.value.sumBy { it.strength }) }
 
     // HELPER METHODS
-
-    fun permutations(first: IntRange, second: IntRange) =
-            first.flatMap { y ->
-                second.map { x ->
-                    Location(x, y)
-                }
-            }
-
-    fun permutations(gameMap: GameMap) = permutations(0 until gameMap.height, 0 until gameMap.width)
 
     fun moveTowards(start: Location, end: Location): Move {
         if (start == end) return Move(start, Direction.STILL)
@@ -659,153 +729,4 @@ object MyBot {
 
     fun dynamicMultiplier(loc: Location) =
             Math.max(1, Math.min(5.0, log2(distanceToEnemyGrid[loc.y][loc.x].toDouble() * if (madeContact) 3.0 else 1.5)).toInt())
-}
-
-fun processFrame(initialMap: GameMap, submittedMoves: Collection<Move>, numPlayers: Int): GameMap {
-    val gameMap = GameMap(initialMap)
-    val width = gameMap.width
-    val height = gameMap.height
-
-    val moves = (0 until height)
-            .map {
-                (0 until width).map { Direction.STILL }.toMutableList()
-            }
-            .toMutableList()
-
-    submittedMoves.forEach {
-        moves[it.loc.y][it.loc.x] = it.dir
-    }
-
-    val pieces = (0 until numPlayers)
-            .map {
-                (0 until height)
-                        .map {
-                            (0 until width).map { null as Int? }.toMutableList()
-                        }
-                        .toMutableList()
-            }
-            .toMutableList()
-
-    (0 until numPlayers).forEach {
-        pieces.add(mutableListOf())
-    }
-
-    (0 until height).forEach y@ { y ->
-        (0 until width).forEach x@ { x ->
-            val direction = moves[y][x]
-            val cell = gameMap.contents[y][x]
-            val player = cell.owner - 1
-            val production = cell.production
-
-            if (cell.owner == 0) return@x
-
-            if (direction == Direction.STILL) {
-                if (cell.strength + production <= 255) cell.strength += cell.production
-                else cell.strength = 255
-            }
-
-            val newLoc = gameMap.getLocation(Location(x, y), direction)
-            if (pieces[player][newLoc.y][newLoc.x] != null) {
-                if (pieces[player][newLoc.y][newLoc.x]!! + cell.strength <= 255)
-                    pieces[player][newLoc.y][newLoc.x] = pieces[player][newLoc.y][newLoc.x]?.plus(cell.strength)
-                else pieces[player][newLoc.y][newLoc.x] = 255
-            } else {
-                pieces[player][newLoc.y][newLoc.x] = cell.strength
-            }
-
-            if (pieces[player][y][x] == null) {
-                pieces[player][y][x] = 0
-            }
-
-            gameMap.contents[y][x] = Site(0, gameMap.contents[y][x].production, 0, Location(x, y))
-        }
-    }
-
-    val toInjure = (0 until numPlayers)
-            .map {
-                (0 until height)
-                        .map {
-                            (0 until width).map { null as Int? }.toMutableList()
-                        }
-                        .toMutableList()
-            }
-            .toMutableList()
-
-    val injureMap = (0 until height)
-            .map {
-                (0 until width).map { 0 }.toMutableList()
-            }
-            .toMutableList()
-
-
-    (0 until height).forEach y@ { y ->
-        (0 until width).forEach x@ { x ->
-            (0 until numPlayers).forEach p@ { p ->
-                if (pieces[p][y][x] != null) {
-                    (0 until numPlayers).forEach q@ { q ->
-                        if (p != q) {
-                            Direction.DIRECTIONS.forEach { dir ->
-                                val loc = gameMap.getLocation(Location(x, y), dir)
-
-                                if (pieces[q][loc.y][loc.x] != null) {
-                                    if (toInjure[q][loc.y][loc.x] != null) {
-                                        toInjure[q][loc.y][loc.x] = toInjure[q][loc.y][loc.x]?.plus(pieces[p][y][x]!!)
-                                    } else {
-                                        toInjure[q][loc.y][loc.x] = pieces[p][y][x]
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (gameMap.contents[y][x].strength > 0) {
-                        if (toInjure[p][y][x] != null) {
-                            toInjure[p][y][x] = toInjure[p][y][x]?.plus(gameMap.contents[y][x].strength)
-                        } else {
-                            toInjure[p][y][x] = gameMap.contents[y][x].strength
-                        }
-                        injureMap[y][x] += pieces[p][y][x]!!
-                    }
-                }
-            }
-        }
-    }
-
-    (0 until numPlayers).forEach p@ { p ->
-        (0 until height).forEach y@ { y ->
-            (0 until width).forEach x@ { x ->
-                if (toInjure[p][y][x] != null) {
-                    if (toInjure[p][y][x]!! >= pieces[p][y][x] ?: 0) {
-                        pieces[p][y][x] = null
-                    } else {
-                        pieces[p][y][x] = pieces[p][y][x]?.minus(toInjure[p][y][x]!!)
-                    }
-                }
-            }
-        }
-    }
-
-    (0 until height).forEach y@ { y ->
-        (0 until width).forEach x@ { x ->
-            if (gameMap.contents[y][x].strength < injureMap[y][x]) {
-                gameMap.contents[y][x].strength = 0
-            } else {
-                gameMap.contents[y][x].strength -= injureMap[y][x]
-            }
-            gameMap.contents[y][x].owner = 0
-        }
-    }
-
-    (0 until numPlayers).forEach p@ { p ->
-        (0 until height).forEach y@ { y ->
-            (0 until width).forEach x@ { x ->
-                if (pieces[p][y][x] != null) {
-                    gameMap.contents[y][x].owner = p + 1
-                    gameMap.contents[y][x].strength = pieces[p][y][x]!!
-                }
-            }
-        }
-    }
-
-    return GameMap(gameMap)
 }
