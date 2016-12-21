@@ -167,48 +167,63 @@ object MyBot {
 
         walkCombatGrid(distanceFromCombat)
 
-        val collected = mutableSetOf<Location>()
-
         gameMap
-                .filter { it.site().isCombat() }
+                .filter { it.isInnerBorder() }
                 .map {
-                    if (it in collected) null
-                    else {
-                        val sphere = walkToDrop(it, distanceFromCombat)
-                        collected.addAll(sphere)
-                        it to sphere.partition { it.site().isMine() }
-                    }
+                    tunnel(it)
                 }
                 .filterNotNull()
-                .forEach {
-                    val loc = it.first
-                    val (mine, enemies) = it.second
-
-                    val myStrength = mine.map { it.site().strength }.sum()
-                    val enemyStrength = enemies.map { it.site().strength }.sum()
-
-                    logger.info("strength around $loc: $myStrength | $enemyStrength")
-
-                    distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, (myStrength - enemyStrength) / 255)
-
-//                    if (myStrength > enemyStrength) {
-////                        // find a place to tunnel
-////                        val tunnelPoint = mine
-////                                .filter { it.isInnerBorder() }
-////                                .map { tunnel(it) }
-////                                .filterNotNull()
-////                                .filter { it.first.site().isEnvironment() }
-////                                .sortedBy { it.second }
-////                                .firstOrNull()?.first
-//
-//                        mine
-//                                .filter { it.isInnerBorder() }
-//                                .flatMap { it.neighbors() }
-//                                .filter { it.isOuterBorder() && it.site().isEnvironment() }
-//                                .minBy { distanceToEnemyGrid[it.y][it.x] }
-//                                ?.let { distanceToEnemyGrid[it.y][it.x] = 0 }
-//                    }
+                .sortedBy { it.second }
+                .firstOrNull()
+                ?.let {
+                    if (playerStats[id]?.production ?: 0 > playerStats[it.first.site().owner]?.production ?: 0) {
+                        distanceToEnemyGrid[it.first.y][it.first.x] = 0
+                        logger.info("mystery loc: ${it.first}")
+                    }
                 }
+
+        val collected = mutableSetOf<Location>()
+
+//        gameMap
+//                .filter { it.site().isCombat() }
+//                .map {
+//                    if (it in collected) null
+//                    else {
+//                        val sphere = walkToDrop(it, distanceFromCombat)
+//                        collected.addAll(sphere)
+//                        it to sphere.partition { it.site().isMine() }
+//                    }
+//                }
+//                .filterNotNull()
+//                .forEach {
+//                    val loc = it.first
+//                    val (mine, enemies) = it.second
+//
+//                    val myStrength = mine.map { it.site().strength }.sum()
+//                    val enemyStrength = enemies.map { it.site().strength }.sum()
+//
+//                    logger.info("strength around $loc: $myStrength | $enemyStrength")
+//
+//                    distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, (myStrength - enemyStrength) / 255)
+//
+////                    if (myStrength > enemyStrength) {
+//////                        // find a place to tunnel
+//////                        val tunnelPoint = mine
+//////                                .filter { it.isInnerBorder() }
+//////                                .map { tunnel(it) }
+//////                                .filterNotNull()
+//////                                .filter { it.first.site().isEnvironment() }
+//////                                .sortedBy { it.second }
+//////                                .firstOrNull()?.first
+////
+////                        mine
+////                                .filter { it.isInnerBorder() }
+////                                .flatMap { it.neighbors() }
+////                                .filter { it.isOuterBorder() && it.site().isEnvironment() }
+////                                .minBy { distanceToEnemyGrid[it.y][it.x] }
+////                                ?.let { distanceToEnemyGrid[it.y][it.x] = 0 }
+////                    }
+//                }
 
         if (enableDirectedWalk) {
             gameMap
@@ -237,7 +252,7 @@ object MyBot {
 
                         while (curr.site().isEnvironment()) {
                             curr = curr.move(it)
-                            distance += curr.site().strength
+                            if (curr.site().isEnvironment()) distance += curr.site().strength
                         }
 
                         if (curr.site().isOtherPlayer()) {
@@ -564,21 +579,31 @@ object MyBot {
                             }
                 }
 
-//        allMoves
-//                .filter { it.key.site().strength == 255 && it.value == Direction.STILL }
-//                .forEach {
-//                    stillMax += 1
-//                    val loc = it.key
+//        val still255 = allMoves.filter { it.key.site().strength == 255 && it.value == Direction.STILL }
+//        if (still255.isNotEmpty()) {
+//            val closest = gameMap
+//                    .filter { it.site().isCombat() }
+//                    .map { cloc ->
+//                        cloc to still255.minBy { gameMap.getDistance(cloc, it.key) }
+//                    }
 //
-//                    val target = loc.neighbors()
-//                            .filter { it.swappable(loc) }
-//                            .shuffle()
+//            closest.forEach {
+//                val source = it.second?.key
+//                if (source != null) {
+//                    val target = source.neighbors()
+//                            .filter { it.site().isEnvironment() }
+//                            .sortedByDescending { it.site().overkill() }
 //                            .firstOrNull()
 //
 //                    if (target != null) {
-//                        finalizeMove(loc, target, false)
+//                        finalizeMove(source, target, true)
 //                    }
 //                }
+//                // logger.info("combat ${it.first} nearest ${it.second?.key}")
+//            }
+//        }
+
+        stillMax = allMoves.filter { it.key.site().strength == 255 && it.value == Direction.STILL }.size
     }
 
     fun makeMove(move: Move) {
@@ -630,7 +655,7 @@ object MyBot {
         Pure
     }
 
-    fun Site.averageResource() = if (!this.isMine() && !this.isCombat()) {
+    fun Site.averageResource() = if (!this.isMine()) {
         (this.loc.neighbors()
                 .filter { it.site().isEnvironment() && it.site().production > 0 }
                 .map {
@@ -641,7 +666,7 @@ object MyBot {
     }
     else 9999
 
-    fun Site.pureResource() = if (!this.isMine() && !this.isCombat()) {
+    fun Site.pureResource() = if (!this.isMine()) {
         if (this.production == 0) Int.MAX_VALUE
         else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
