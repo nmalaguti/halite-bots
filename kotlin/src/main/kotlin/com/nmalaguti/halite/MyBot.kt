@@ -296,12 +296,11 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * 5,
-                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())) &&
+                                    loc.site().strength > Math.max(loc.site().production * 5, MINIMUM_STRENGTH * 2) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
-                            .sortedByDescending { it.site().overkill() }
+                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
                             .firstOrNull()
 
                     if (target != null) {
@@ -321,7 +320,11 @@ object MyBot {
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
                     val wouldAttack = loc.neighbors()
-                            .filter { it.site().isMine() && it !in sources && it.site().strength > it.site().production * 2 }
+                            .filter {
+                                it.site().isMine() &&
+                                        it !in sources &&
+                                        it.site().strength > Math.max(it.site().production * 5, MINIMUM_STRENGTH * 2)
+                            }
                             .filter { distanceToEnemyGrid[it.y][it.x] > distanceToEnemyGrid[loc.y][loc.x] }
 
                     allCombos(wouldAttack)
