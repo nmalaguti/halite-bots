@@ -1,8 +1,9 @@
 package com.nmalaguti.halite
 
+import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyChargerBot"
+val BOT_NAME = "MyEarlyBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -56,6 +57,8 @@ object MyBot {
             // reset all moves
             allMoves = mutableSetOf()
 
+            buildOtherGrid()
+
             buildDistanceToEnemyGrid()
 
             stillMax = 0
@@ -73,12 +76,64 @@ object MyBot {
 
     // MOVE LOGIC
 
+    var otherGrid = mutableListOf<MutableList<Int>>()
+
+    fun buildOtherGrid() {
+        otherGrid = mutableListOf<MutableList<Int>>()
+        for (y in 0 until gameMap.height) {
+            val row = mutableListOf<Int>()
+            for (x in 0 until gameMap.width) {
+                row.add(-1)
+            }
+            otherGrid.add(row)
+        }
+
+        val initial = gameMap
+                .filter { it.site().isEnvironment() }
+                .sortedBy { it.site().resource() }
+                .toMutableSet()
+
+        walkOtherGrid(initial)
+
+        logGrid(otherGrid)
+    }
+
+    fun walkOtherGrid(openSet: MutableSet<Location>) {
+        val closedSet = mutableSetOf<Location>()
+        while (openSet.isNotEmpty()) {
+            val current = openSet.first()
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (!current.site().isMine()) {
+                    if (otherGrid[current.y][current.x] < 0) {
+                        otherGrid[current.y][current.x] =
+                                (current.neighbors().filter { otherGrid[it.y][it.x] > -1 }.map { otherGrid[it.y][it.x] }.min() ?: 0) +
+                                        Math.max(0, (current.site().strength / (current.site().production + stillMax).toDouble()).toInt())
+                    } else {
+                        otherGrid[current.y][current.x] = Math.min(
+                                otherGrid[current.y][current.x],
+                                current.site().strength +
+                                        (current.neighbors().filter { otherGrid[it.y][it.x] > -1 }.map { otherGrid[it.y][it.x] }.min() ?: 0))
+                    }
+
+                    openSet.addAll(current.neighbors())
+                }
+            }
+        }
+    }
+
     fun buildDistanceToEnemyGrid() {
         distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
         for (y in 0 until gameMap.height) {
             val row = mutableListOf<Int>()
             for (x in 0 until gameMap.width) {
-                row.add(Location(x, y).site().resource())
+                if (otherGrid[y][x] > -1) {
+                    row.add(otherGrid[y][x])
+                } else {
+                    row.add(9999)
+                }
             }
             distanceToEnemyGrid.add(row)
         }
@@ -88,6 +143,25 @@ object MyBot {
         }
 
         logGrid(distanceToEnemyGrid)
+
+//        val temp = mutableListOf<MutableList<Int>>()
+//        for (y in 0 until gameMap.height) {
+//            val row = mutableListOf<Int>()
+//            for (x in 0 until gameMap.width) {
+//                row.add(Location(x, y).site().resource())
+//            }
+//            temp.add(row)
+//        }
+//
+//        walkGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet(), temp)
+//
+//        logGrid(temp)
+//
+//        for (y in 0 until gameMap.height) {
+//            for (x in 0 until gameMap.width) {
+//                assert(distanceToEnemyGrid[y][x] == temp[y][x])
+//            }
+//        }
     }
 
     fun walkGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>): Boolean {
@@ -106,7 +180,7 @@ object MyBot {
 //                                    (territory / border.toDouble()).toInt() +
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                            current.site().production
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
@@ -118,6 +192,34 @@ object MyBot {
         }
 
         return changed
+    }
+
+    fun walkGrid(openSet: MutableSet<Location>, grid: MutableList<MutableList<Int>>) {
+        val pq = PriorityQueue<Location>(compareBy { grid[it.y][it.x] })
+        pq.addAll(openSet)
+
+        val closedSet = mutableSetOf<Location>()
+        while (pq.isNotEmpty()) {
+            val current = pq.poll()
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (current.site().isMine()) {
+                    grid[current.y][current.x] =
+                            Math.min(
+                                    grid[current.y][current.x],
+//                                        (territory / border.toDouble()).toInt() +
+                                    1 +
+                                            current.neighbors().map { grid[it.y][it.x] }.min()!! +
+                                            current.site().production
+                            )
+                }
+
+                current.neighbors()
+                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                        .forEach { pq.offer(it) }
+            }
+        }
     }
 
     fun logGrid(grid: List<List<Int>>) {
@@ -363,13 +465,20 @@ object MyBot {
             }
 
     fun Site.resource() = if (!this.isMine()) {
-        (this.loc.neighbors()
-                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
-                .map {
-                    (it.site().strength / (it.site().production + stillMax).toDouble())
-                }
-                .average() + (this.strength / (this.production + stillMax).toDouble()))
-                .toInt() / 2
+        if (this.production == 0) Int.MAX_VALUE
+        else {
+            val endOfTunnel = this.loc.neighbors()
+                    .filter { it.site().isMine() }
+                    .any { it.neighbors().filter { it.site().isMine() }.size == 1 }
+
+            val inTunnel = this.loc.neighbors()
+                    .filter { it.site().isMine() }
+                    .any { it.neighbors().filter { it.site().isMine() }.size == 2 } &&
+                    !(this.isEnvironment() && this.strength == 0)
+
+            Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt()) /*-
+                    (if (endOfTunnel) 0 else 0) + (if (inTunnel) 25 else 0)*/
+        }
     }
     else 9999
 
@@ -433,6 +542,68 @@ object MyBot {
             Move(start, Direction.EAST)
         } else { // if (angle >= 3 * -pi4 && angle <= -pi4)
             Move(start, Direction.NORTH)
+        }
+    }
+
+    class Grid<T : Comparable<T>>(val resource: (Location) -> T,
+                                  val initials: Collection<Location>,
+                                  val value: (Location, Grid<T>) -> T,
+                                  val shouldUpdate: (Location) -> Boolean,
+                                  val shouldAdd: (Location) -> Boolean) {
+        val grid: MutableList<MutableList<T>>
+
+        init {
+            grid = (0 until gameMap.height)
+                    .map { y ->
+                        (0 until gameMap.width)
+                                .map { x -> resource(Location(x, y)) }
+                                .toMutableList()
+                    }
+                    .toMutableList()
+
+            walkGrid(initials.toMutableSet())
+
+            logGrid()
+        }
+
+        fun walkGrid(openSet: MutableSet<Location>) {
+            val closedSet = mutableSetOf<Location>()
+            while (openSet.isNotEmpty()) {
+                val current = openSet.minBy { grid[it.y][it.x] }!!
+                openSet.remove(current)
+                if (current !in closedSet) {
+                    closedSet.add(current)
+
+                    if (shouldUpdate(current)) {
+                        val nextValue = value(current, this)
+                        if (nextValue < grid[current.y][current.x]) {
+                            grid[current.y][current.x] = nextValue
+                        }
+                    }
+
+                    current.neighbors()
+                            .filter { shouldAdd(current) }
+                            .forEach { openSet.add(it) }
+                }
+            }
+        }
+
+        fun logGrid() {
+            val builder = StringBuilder("\n")
+            builder.append("     ")
+            builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
+            builder.append("\n")
+            for (y in 0 until gameMap.height) {
+                builder.append("$y".take(3).padEnd(4) + " ")
+                builder.append(grid[y].map { "$it".take(3).padEnd(4) }.joinToString(" "))
+                builder.append(" " + "$y".take(3).padEnd(4))
+                builder.append("\n")
+            }
+            builder.append("     ")
+            builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
+            builder.append("\n")
+
+            logger.info(builder.toString())
         }
     }
 }
