@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySuperChargerBot"
+val BOT_NAME = "MyExpansionBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -96,7 +96,7 @@ object MyBot {
                                 .map { distanceToEnemyGrid[it.y][it.x] }
                                 .min() ?: Int.MAX_VALUE
 
-                        if (value * 2 < valueToBeat) {
+                        if (value < valueToBeat) {
                             distanceToEnemyGrid[loc.y][loc.x] = value
                         }
                     }
@@ -129,7 +129,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > 7) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / 4) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
@@ -164,7 +164,8 @@ object MyBot {
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            ((Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()) / Math.max(1, stillMax))
+                                            if (madeContact) ((Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()) / Math.max(1, stillMax))
+                                            else 0
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
@@ -362,7 +363,7 @@ object MyBot {
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
-                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
+                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().production }, { -it.site().overkill() }))
                             .firstOrNull()
 
                     if (target != null) {
