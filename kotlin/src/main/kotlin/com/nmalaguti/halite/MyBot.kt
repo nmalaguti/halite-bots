@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyAvgFinerBot"
+val BOT_NAME = "MySuperChargerBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -19,10 +19,7 @@ object MyBot {
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
-    var distanceToBorder = mutableListOf<MutableList<Int>>()
     var stillMax: Int = 0
-    var territory: Int = 0
-    var border: Int = 0
     var madeContact: Boolean = false
 
     fun init() {
@@ -62,8 +59,6 @@ object MyBot {
             buildDistanceToEnemyGrid()
 
             stillMax = 0
-            territory = gameMap.filter { it.site().isMine() }.size
-            border = gameMap.filter { it.isInnerBorder() }.size
 
             madeContact = gameMap.any {
                 it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isMine() }
@@ -72,7 +67,6 @@ object MyBot {
             makeBattleMoves()
 
             logger.info("stillMax: $stillMax")
-            logger.info("additive: ${(territory / border.toDouble()).toInt()}")
 
             endGameLoop()
         }
@@ -88,20 +82,6 @@ object MyBot {
                 row.add(Location(x, y).site().resource())
             }
             distanceToEnemyGrid.add(row)
-        }
-
-        distanceToBorder = mutableListOf<MutableList<Int>>()
-        for (y in 0 until gameMap.height) {
-            val row = mutableListOf<Int>()
-            for (x in 0 until gameMap.width) {
-                if (Location(x, y).site().isMine()) {
-                    row.add(9999)
-                } else {
-                    row.add(if (madeContact) 5 else 0)
-                }
-
-            }
-            distanceToBorder.add(row)
         }
 
         if (!madeContact) {
@@ -130,16 +110,13 @@ object MyBot {
                     walkGridFrom(mutableSetOf(it), mutableSetOf())
                 }
 
-        walkMyGrid(gameMap.filter { it.isInnerBorder() }.toMutableSet())
-
-        logGrid(distanceToBorder)
         logGrid(distanceToEnemyGrid)
     }
 
     fun directedWalk(loc: Location): Int {
         val locToValue = mutableMapOf<Location, Double>()
         var minAvg: Double = loc.site().resource().toDouble()
-        var queue = ArrayDeque<Location>()
+        val queue = ArrayDeque<Location>()
         queue.addFirst(loc)
         locToValue[loc] = minAvg
         val visited = mutableSetOf<Location>()
@@ -185,11 +162,9 @@ object MyBot {
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
-//                                    (territory / border.toDouble()).toInt() +
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
                                             ((Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()) / Math.max(1, stillMax))
-//                                            current.site().production
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
@@ -201,29 +176,6 @@ object MyBot {
         }
 
         return changed
-    }
-
-    fun walkMyGrid(openSet: MutableSet<Location>) {
-        val closedSet = mutableSetOf<Location>()
-        while (openSet.isNotEmpty()) {
-            val current = openSet.first()
-            openSet.remove(current)
-            if (current !in closedSet) {
-                closedSet.add(current)
-
-                if (current.site().isMine()) {
-                    distanceToBorder[current.y][current.x] =
-                            Math.min(
-                                    distanceToBorder[current.y][current.x],
-                                    1 + current.neighbors().map { distanceToBorder[it.y][it.x] }.min()!!
-                            )
-                }
-
-                current.neighbors()
-                        .filter { current.site().isMine() }
-                        .forEach { openSet.add(it) }
-            }
-        }
     }
 
     fun logGrid(grid: List<List<Int>>) {
@@ -405,8 +357,8 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * Math.min(5, distanceToBorder[loc.y][loc.x]),
-                                            (MINIMUM_STRENGTH * 2) / Math.max(1, 5 - distanceToBorder[loc.y][loc.x])) &&
+                                    loc.site().strength > Math.max(loc.site().production * 5,
+                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -433,8 +385,8 @@ object MyBot {
                             .filter {
                                 it.site().isMine() &&
                                         it !in sources &&
-                                        it.site().strength > Math.max(it.site().production * Math.min(5, distanceToBorder[it.y][it.x]),
-                                                (MINIMUM_STRENGTH * 2) / Math.max(1, 5 - distanceToBorder[it.y][it.x]))
+                                        it.site().strength > Math.max(it.site().production * 5,
+                                                Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt()))
                             }
                             .filter { distanceToEnemyGrid[it.y][it.x] > distanceToEnemyGrid[loc.y][loc.x] }
 
@@ -478,15 +430,13 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0) 9999
-        else Math.min(
-                Math.max(0, (this.strength / (this.production + stillMax).toDouble()).toInt()),
-                (this.loc.neighbors()
-                        .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
-                        .map {
-                            (it.site().strength / (it.site().production + stillMax).toDouble())
-                        }
-                        .average() + (this.strength / (this.production + stillMax).toDouble()))
-                        .toInt() / 2)
+        else (this.loc.neighbors()
+                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
+                .map {
+                    (it.site().strength / (it.site().production + stillMax).toDouble())
+                }
+                .average() + (this.strength / (this.production + stillMax).toDouble()))
+                .toInt() / 2
     }
     else 9999
 
