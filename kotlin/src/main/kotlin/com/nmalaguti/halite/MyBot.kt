@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyExpansionBot"
+val BOT_NAME = "MyFighterBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -102,6 +102,28 @@ object MyBot {
                     }
         }
 
+        if (stillMax > 1) {
+            gameMap
+                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
+                    .forEach { loc ->
+                        val owners = loc.neighbors()
+
+                        val combatCells = owners.filter { it.site().isEnvironment() && it.site().strength == 0 }
+                        val environmentCells = owners.filter { it.site().isEnvironment() && it.site().strength > 0 }
+                        val otherPlayerCells = owners.filter { it.site().isOtherPlayer() }
+                        val myCells = owners.filter { it.site().isMine() }
+
+                        if (myCells.isNotEmpty() && otherPlayerCells.isNotEmpty() && combatCells.isEmpty() && environmentCells.size == 2) {
+                            if (otherPlayerCells.map { it.site().owner }.all { playerStats[it]?.strength ?: 0 < playerStats[id]?.strength ?: 0 }) {
+                                environmentCells.forEach {
+                                    distanceToEnemyGrid[it.y][it.x] = 0
+                                }
+                            }
+                        }
+                    }
+        }
+
+
         gameMap
                 .filter { it.isOuterBorder() }
                 .sortedBy { distanceToEnemyGrid[it.y][it.x] }
@@ -164,7 +186,7 @@ object MyBot {
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            if (madeContact) ((Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()) / Math.max(1, stillMax))
+                                            if (madeContact) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                             else 0
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
@@ -363,7 +385,7 @@ object MyBot {
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
-                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().production }, { -it.site().overkill() }))
+                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { if (madeContact) 0 else -it.site().production }, { -it.site().overkill() }))
                             .firstOrNull()
 
                     if (target != null) {
@@ -431,13 +453,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0) 9999
-        else (this.loc.neighbors()
-                .filter { it.site().isEnvironment() && it.site().strength > 0 && it.site().production > 0 }
-                .map {
-                    (it.site().strength / (it.site().production + stillMax).toDouble())
-                }
-                .average() + (this.strength / (this.production + stillMax).toDouble()))
-                .toInt() / 2
+        else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
 
