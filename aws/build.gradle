@@ -31,9 +31,13 @@ shadowJar {
 }
 
 distributions {
-    main {
+    client {
+        baseName = 'CloudBots'
         contents {
-            from shadowJar
+            from (file("$projectDir/client")) {
+                exclude 'node_modules'
+                includeEmptyDirs false
+            }
         }
     }
 }

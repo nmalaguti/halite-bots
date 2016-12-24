@@ -10,7 +10,7 @@ import com.nmalaguti.halite.Site
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-class FrugalBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap) : Bot {
+class FrugalBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap) {
     var allMoves = mutableSetOf<Move>()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     val logger: Logger = LoggerFactory.getLogger(FrugalBot::class.java)
@@ -18,7 +18,7 @@ class FrugalBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap
     var movedLocations = setOf<Location>()
     var innerBorderCells: List<Location> = listOf()
 
-    override fun runOnce(): List<Move> {
+    fun runOnce(): List<Move> {
         lastTurnMoves = previousMoves.associateBy { it.loc }
 
         // reset all moves

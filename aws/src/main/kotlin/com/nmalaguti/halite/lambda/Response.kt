@@ -1,5 +1,3 @@
 package com.nmalaguti.halite.lambda
 
-import com.nmalaguti.halite.Move
-
-class Response(val moves: List<Move>)
+class Response(val statusCode: Int, val headers: Map<String, String>, val body: String)

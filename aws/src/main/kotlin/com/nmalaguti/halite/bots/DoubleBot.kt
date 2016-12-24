@@ -12,7 +12,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import kotlin.comparisons.compareBy
 
-class DoubleBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap) : Bot {
+class DoubleBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap) {
     lateinit var nextMap: GameMap
     var allMoves = mutableSetOf<Move>()
     var lastTurnMoves: Map<Location, Move> = mapOf()
@@ -20,7 +20,7 @@ class DoubleBot(val id: Int, val previousMoves: List<Move>, val gameMap: GameMap
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
     val logger: Logger = LoggerFactory.getLogger(DoubleBot::class.java)
 
-    override fun runOnce(): List<Move> {
+    fun runOnce(): List<Move> {
         nextMap = GameMap(gameMap)
         lastTurnMoves = previousMoves.associateBy { it.loc }
         playerStats = playerStats()

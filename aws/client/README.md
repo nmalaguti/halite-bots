@@ -41,3 +41,7 @@ Stronger than Bridget. Might rank close to the top of Gold?
 ## Bridget
 
 In the OverkillBot lineage. Should definitely be Gold level.
+
+## Cathy
+
+Was recently in the top 5 bots. Achieved rank 1.
