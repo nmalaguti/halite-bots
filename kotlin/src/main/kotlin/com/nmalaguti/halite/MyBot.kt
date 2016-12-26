@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFighterBot"
+val BOT_NAME = "MyWeightedBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -226,6 +226,20 @@ object MyBot {
         val sources = mutableMapOf<Location, Direction>()
         val destinations = mutableMapOf<Location, Direction>()
 
+        val bestTargetStrength = gameMap
+                .filter { it.isOuterBorder() }
+                .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                .minBy { distanceToEnemyGrid[it.y][it.x] }
+                ?.site()
+                ?.strength ?: 255
+
+        val myProduction = playerStats[id]?.production ?: 1
+
+        val minimumStrength = Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5
+
+        logger.info("minimum strength: $minimumStrength")
+        logger.info("alt min: ${Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())}")
+
         fun Location.swappable(source: Location) =
                 this != source &&
                         this.site().isMine() &&
@@ -380,12 +394,14 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > Math.max(loc.site().production * 5,
-                                            Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt())) &&
+                                    loc.site().strength > Math.max(loc.site().production * 5, minimumStrength) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
-                            .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { if (madeContact) 0 else -it.site().production }, { -it.site().overkill() }))
+                            .sortedWith(compareBy(
+                                    { distanceToEnemyGrid[it.y][it.x] },
+                                    { if (madeContact) 0 else -it.site().production },
+                                    { -it.site().overkill() }))
                             .firstOrNull()
 
                     if (target != null) {
@@ -408,8 +424,7 @@ object MyBot {
                             .filter {
                                 it.site().isMine() &&
                                         it !in sources &&
-                                        it.site().strength > Math.max(it.site().production * 5,
-                                                Math.min(MINIMUM_STRENGTH * 2, Math.pow(1.058, turn.toDouble()).toInt()))
+                                        it.site().strength > Math.max(it.site().production * 5, minimumStrength)
                             }
                             .filter { distanceToEnemyGrid[it.y][it.x] > distanceToEnemyGrid[loc.y][loc.x] }
 
