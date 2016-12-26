@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyOrientationBot"
+val BOT_NAME = "MyDuelistBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -22,13 +22,17 @@ object MyBot {
     var directedGrid = mapOf<Location, Pair<Int, Int>>()
     var stillMax: Int = 0
     var madeContact: Boolean = false
+    var numPlayers: Int = 0
 
     fun init() {
         val init = Networking.getInit()
         gameMap = init.gameMap
         id = init.myID
 
+        numPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
+
         logger.info("id: $id")
+        logger.info("numPlayers: $numPlayers")
 
         Networking.sendInit(BOT_NAME)
     }
@@ -119,6 +123,19 @@ object MyBot {
                                 }
                             }
                         }
+                    }
+        }
+
+        if (numPlayers == 2) {
+            val lowestValue = gameMap
+                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                    .map { distanceToEnemyGrid[it.y][it.x] }
+                    .min() ?: 0
+
+            gameMap
+                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
+                    .forEach { loc ->
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue
                     }
         }
 
