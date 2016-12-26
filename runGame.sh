@@ -34,11 +34,42 @@ rm -f *.log* *.hlt
 
 # 2023371628 # bad for finer, really good for average based bots
 
-./halite -d "35 35" \
+./halite -d "35 35" -s 1286846703 \
+    "tournament/bots/available/fighterbot/run.sh" \
     "tournament/bots/available/thugbot/run.sh" \
     "tournament/bots/available/superchargerbot/run.sh" \
-    "tournament/bots/available/expansionbot/run.sh" \
     "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# used for optimizing sort order for targets
+#./halite -d "35 35" -s 1286846703 \
+#    "tournament/bots/available/fighterbot/run.sh" \
+#    "tournament/bots/available/thugbot/run.sh" \
+#    "tournament/bots/available/superchargerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# investigate order of neighbors
+#./halite -d "35 35" -s 2491474543 \
+#    "tournament/bots/available/fighterbot/run.sh" \
+#    "tournament/bots/available/thugbot/run.sh" \
+#    "tournament/bots/available/superchargerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 3933202914 \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+#    "tournament/bots/available/fighterbot/run.sh" \
+
+#./halite -d "45 45" -s 1119897993 \
+#    "tournament/bots/available/fighterbot/run.sh" \
+#    "tournament/bots/available/thugbot/run.sh" \
+#    "tournament/bots/available/superchargerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#    "tournament/bots/available/fighterbot/run.sh" \
+
+
+#./halite -d "35 35" -s 1467275615 \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+#    "tournament/bots/available/fighterbot/run.sh" \
 
 #./halite -d "35 35" -s 1588947454 \
 #    "tournament/bots/available/thugbot/run.sh" \
