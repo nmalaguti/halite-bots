@@ -130,7 +130,7 @@ object MyBot {
             gameMap
                     .filter { it.site().isEnvironment() && it.site().strength == 0 }
                     .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 2
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue
                     }
         }
 
@@ -240,7 +240,8 @@ object MyBot {
         val bestTargetStrength = gameMap
                 .filter { it.isOuterBorder() }
                 .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                .minBy { distanceToEnemyGrid[it.y][it.x] }
+                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { it.site().strength }))
+                .firstOrNull()
                 ?.site()
                 ?.strength ?: 255
 
@@ -410,7 +411,11 @@ object MyBot {
                                     .sortedWith(compareBy(
                                             { -it.site().overkill() },
                                             { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-                                            { -it.site().production }
+                                            { -it.site().production },
+                                            { -(it.neighbors().filterNot { it.site().isMine() }.map { it.site().production }.max() ?: 0) },
+                                            { it.distanceToEnemy() },
+                                            { -it.neighbors().filter { it.site().isEnvironment() && it.site().strength == 0 }.size },
+                                            { -it.cornerNeighbors().filter { it.site().isOtherPlayer() }.size }
                                     ))
 //                                    .let {
 //                                        it
@@ -418,7 +423,11 @@ object MyBot {
 //                                                    it to listOf(
 //                                                            -it.site().overkill(),
 //                                                            -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size,
-//                                                            -it.site().production
+//                                                            -it.site().production,
+//                                                            -(it.neighbors().filterNot { it.site().isMine() }.map { it.site().production }.max() ?: 0),
+//                                                            it.distanceToEnemy(),
+//                                                            -it.neighbors().filter { it.site().isEnvironment() && it.site().strength == 0 }.size,
+//                                                            -it.cornerNeighbors().filter { it.site().isOtherPlayer() }.size
 //                                                    )
 //                                                }
 //                                                .groupBy { it.second }
@@ -494,7 +503,12 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
                                     { -it.site().overkill() },
-                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }))
+                                    { if (nextMap.getSite(it).isMine()) -it.site().production else 0 },
+                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
+                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
+                                    { it.neighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() },
+                                    { it.cornerNeighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() }
+                            ))
 //                            .let {
 //                                it
 //                                        .map {
@@ -506,7 +520,12 @@ object MyBot {
 //                                                    if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
 //                                                    if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
 //                                                    -it.site().overkill(),
-//                                                    -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size)
+//                                                    if (nextMap.getSite(it).isMine()) -it.site().production else 0,
+//                                                    -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
+//                                                    if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1,
+//                                                    it.neighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average(),
+//                                                    it.cornerNeighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average()
+//                                            )
 //                                        }
 //                                        .groupBy { it.second }
 //                                        .let {
@@ -635,6 +654,33 @@ object MyBot {
 
             it to distance
         }.sortedBy { it.second }.first().first
+    }
+
+    fun Location.distanceToEnemy(): Int {
+        val openSet = mutableSetOf(this)
+        val closedSet = mutableSetOf<Location>()
+        val grid = mutableMapOf<Location, Int>()
+
+        grid[this] = 0
+
+        while (openSet.isNotEmpty()) {
+            val current = openSet.first()
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (current.site().isOtherPlayer()) return grid[current] ?: 0
+
+                current.neighbors()
+                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                        .forEach {
+                            grid[it] = Math.min(grid.getOrPut(it, { 9999 }), grid[current] ?: 0 + 1)
+                            openSet.add(it)
+                        }
+            }
+        }
+
+        return 9999
     }
 
     fun Location.allNeighborsWithin(distance: Int) = gameMap.filter { gameMap.getDistance(it, this) <= distance }

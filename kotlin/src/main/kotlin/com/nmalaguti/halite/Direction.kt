@@ -32,4 +32,12 @@ enum class Direction {
             return fromInteger(Random().nextInt(5))!!
         }
     }
+
+    fun opposite() = when (this) {
+        NORTH -> SOUTH
+        SOUTH -> NORTH
+        EAST -> WEST
+        WEST -> EAST
+        STILL -> STILL
+    }
 }
