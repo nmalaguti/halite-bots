@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyDirectedAlwaysBot"
+val BOT_NAME = "MySeekerBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -130,7 +130,7 @@ object MyBot {
             gameMap
                     .filter { it.site().isEnvironment() && it.site().strength == 0 }
                     .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 2
                     }
         }
 
@@ -196,7 +196,7 @@ object MyBot {
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            if (madeContact) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                            if (madeContact && numPlayers != 2) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
 //                                                Math.max(1, (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt()) - if (stillMax > 5) 1 else 0)
                                             else 0
                             )
@@ -235,7 +235,7 @@ object MyBot {
         val battleBlackout = mutableSetOf<Location>()
 
         val sources = mutableMapOf<Location, Direction>()
-        val destinations = mutableMapOf<Location, Direction>()
+        val destinations = mutableSetOf<Location>()
 
         val bestTargetStrength = gameMap
                 .filter { it.isOuterBorder() }
@@ -254,14 +254,16 @@ object MyBot {
         fun Location.swappable(source: Location) =
                 this != source &&
                         this.site().isMine() &&
-                        (this !in sources || sources[this] == Direction.STILL) &&
-                        (this !in destinations || destinations[this] == Direction.STILL) &&
+                        this !in sources &&
+                        this !in destinations &&
                         ((source.site().strength == 255 && this.site().strength < 255) ||
                                 this.site().strength + 15 < source.site().strength)
 
         fun updateNextMap(move: Move) {
             val source = move.loc
             val target = move.loc.move(move.dir)
+
+            if (source in sources) logger.warning("Source $source in sources")
 
             val originSite = gameMap.getSite(source)
             val targetSite = gameMap.getSite(target)
@@ -270,7 +272,7 @@ object MyBot {
 
             if (startSite.owner == destinationSite.owner) {
                 if (move.dir == Direction.STILL) {
-                    destinationSite.strength += destinationSite.production
+                    logger.warning("Made move STILL at $source")
                 } else {
                     startSite.strength -= originSite.strength
                     destinationSite.strength += originSite.strength
@@ -309,32 +311,32 @@ object MyBot {
 
                 sources.put(source, move1.dir)
                 sources.put(target, move2.dir)
-                destinations.put(source, move2.dir)
-                destinations.put(target, move1.dir)
-            } else {
-                var move = moveTowards(source, target)
+
+                destinations.add(source)
+                destinations.add(target)
+            } else if (source != target) {
+                val move = moveTowards(source, target)
 
                 if (preventSwaps) {
                     val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
                     if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
-                        move = Move(source, Direction.STILL)
+                        return
                     }
+                }
 
-                    if (nextMap.getSite(target).isMine() && gameMap.getSite(source).strength + nextMap.getSite(target).strength >= MAXIMUM_STRENGTH) {
-                        move = Move(source, Direction.STILL)
-                    }
+                if (nextMap.getSite(target).isMine() && gameMap.getSite(source).strength + nextMap.getSite(target).strength >= MAXIMUM_STRENGTH) {
+                    logger.warning("Move from $source to $target causes cap loss")
                 }
 
                 updateNextMap(move)
 
                 allMoves.add(move)
 
-                if (addToBattleBlackout && target != source) battleBlackout.add(source)
-                if (target != source) blackoutCells.add(source)
+                if (addToBattleBlackout) battleBlackout.add(source)
+                blackoutCells.add(source)
 
                 sources.put(source, move.dir)
-                destinations.put(target, move.dir)
-                if (source.site().strength == 255 && move.dir == Direction.STILL) stillMax += 1
+                destinations.add(target)
             }
         }
 
@@ -360,18 +362,45 @@ object MyBot {
             return combos
         }
 
+        /////////////////////////////////////////////////////
+
+//        gameMap
+//                .filter { it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isOtherPlayer() } }
+//                .forEach { loc ->
+//                    loc.neighbors().plus(loc.cornerNeighbors())
+//                            .filter { it !in sources && it.site().isMine() && it.site().strength > 180 }
+//                            .sortedWith(compareBy(
+//                                    { mine -> if (mine.neighbors().any { it.site().isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }) 0 else 1 },
+//                                    { -it.site().strength }))
+//                            .dropLast(1)
+//                            .forEach { mine ->
+//                                // move away if possible
+//                                mine.neighbors()
+//                                        .filter {
+//                                            (it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().none { nextMap.getSite(it).isMine() && nextMap.getSite(it).strength > 180 }) ||
+//                                                    (nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH)
+//                                        }
+//                                        .sortedBy { if (it.site().isEnvironment()) 0 else 1 }
+//                                        .firstOrNull()
+//                                        ?.let { target ->
+//                                            finalizeMove(mine, target, true, false)
+//                                        }
+//                            }
+//                }
+
         gameMap
-                .filter { it.site().isMine() && it.site().strength > 0 }
+                .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
                 .sortedByDescending { it.site().strength }
                 .forEach { loc ->
                     // on the edge of battle
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
+                    if (loc in sources) return@forEach
+
                     val target =
                             if (loc.site().strength < loc.site().production * 2 || loc.site().strength < MINIMUM_STRENGTH) loc
                             else loc.neighbors()
-                                    .reversed()
                                     .filter { it.site().isEnvironment() && it.site().strength == 0 }
                                     .filter { it !in battleBlackout }
                                     .filter {
@@ -409,6 +438,26 @@ object MyBot {
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
+
+//                    if (target.neighbors().any { it.site().isOtherPlayer() }) {
+//                        battleBlackout.addAll(target.neighbors())
+//                        target.neighbors().plus(target.cornerNeighbors())
+//                                .filter { it != loc }
+//                                .filter { it !in sources && nextMap.getSite(it).isMine() && nextMap.getSite(it).strength > 180 }
+//                                .forEach { mine ->
+//                                    // move away if possible
+//                                    mine.neighbors()
+//                                            .filter {
+//                                                (it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().none { nextMap.getSite(it).isMine() && nextMap.getSite(it).strength > 180 }) ||
+//                                                        (nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH)
+//                                            }
+//                                            .sortedBy { if (it.site().isEnvironment()) 0 else 1 }
+//                                            .firstOrNull()
+//                                            ?.let { target ->
+//                                                finalizeMove(mine, target, true, false)
+//                                            }
+//                                }
+//                    }
                 }
 
         gameMap
@@ -417,7 +466,7 @@ object MyBot {
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
-                    var target = loc.neighbors()
+                    val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it.y][it.x] < distanceToEnemyGrid[loc.y][loc.x] }
@@ -473,11 +522,12 @@ object MyBot {
 //                                        }
 //                                it
 //                            }
-                            .firstOrNull() ?: loc
+                            .firstOrNull()
 
-                    if (target in blackoutCells && loc.site().strength < 255) target = loc
-
-                    finalizeMove(loc, target!!, false, true)
+                    if (target != null) {
+                        if (target in blackoutCells && loc.site().strength < 255) logger.warning("Want to move $loc to $target but it is a blackout cell and source doesn't have 255 strength")
+                        finalizeMove(loc, target, false, true)
+                    }
                 }
 
         gameMap
@@ -505,6 +555,10 @@ object MyBot {
                                 finalizeMove(it, loc, false, true)
                             }
                 }
+
+        stillMax = gameMap
+                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
+                .size
     }
 
     // EXTENSIONS METHODS
@@ -551,6 +605,13 @@ object MyBot {
     fun Location.neighbors() = Direction.CARDINALS.map { this.move(it) }
 
     fun Location.neighborsAndSelf() = Direction.DIRECTIONS.map { this.move(it) }
+
+    fun Location.cornerNeighbors() = listOf<Location>(
+            this.move(Direction.NORTH).move(Direction.WEST),
+            this.move(Direction.NORTH).move(Direction.EAST),
+            this.move(Direction.SOUTH).move(Direction.WEST),
+            this.move(Direction.SOUTH).move(Direction.EAST)
+    )
 
     fun Location.enemies() = this.neighbors().filterNot { it.site().isMine() }
 
