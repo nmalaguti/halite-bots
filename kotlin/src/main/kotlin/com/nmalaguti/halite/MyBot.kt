@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyOrientationBot"
+val BOT_NAME = "MyDirectedAlwaysBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -22,6 +22,7 @@ object MyBot {
     var directedGrid = mapOf<Location, Pair<Int, Int>>()
     var stillMax: Int = 0
     var madeContact: Boolean = false
+    var numPlayers: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -53,6 +54,7 @@ object MyBot {
 
             lastTurnMoves = allMoves.associateBy { it.loc }
             playerStats = playerStats()
+            numPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
 
             // reset all moves
             allMoves = mutableSetOf()
@@ -85,20 +87,17 @@ object MyBot {
             distanceToEnemyGrid.add(row)
         }
 
-        if (!madeContact) {
-            directedGrid = gameMap
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                    .map { it to directedWalk(it) }
-                    .toMap()
+        directedGrid = gameMap
+                .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                .map { it to directedWalk(it) }
+                .toMap()
 
-            directedGrid.forEach {
-                val (loc, value) = it
+        directedGrid.forEach {
+            val (loc, value) = it
 
-                if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
-                    distanceToEnemyGrid[loc.y][loc.x] = value.second
-                }
+            if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
+                distanceToEnemyGrid[loc.y][loc.x] = value.second
             }
-
         }
 
         if (stillMax > 1) {
@@ -122,6 +121,18 @@ object MyBot {
                     }
         }
 
+        if (numPlayers == 2) {
+            val lowestValue = gameMap
+                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                    .map { distanceToEnemyGrid[it.y][it.x] }
+                    .min() ?: 0
+
+            gameMap
+                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
+                    .forEach { loc ->
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue
+                    }
+        }
 
         gameMap
                 .filter { it.isOuterBorder() }
@@ -159,7 +170,7 @@ object MyBot {
             currLoc.neighbors()
                     .filter { it.site().isEnvironment() && it.site().strength > 0 }
                     .forEach {
-                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + 3)))
+                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + if (madeContact) 4 else 3)))
                         val currValue = locToValue.getOrPut(it, { dist to nextValue }).second
                         if (nextValue < currValue) locToValue[it] = dist to nextValue
                         queue.addLast(it)
@@ -462,16 +473,11 @@ object MyBot {
 //                                        }
 //                                it
 //                            }
-                            .firstOrNull()
+                            .firstOrNull() ?: loc
 
-                    if (target != null) {
-                        if (target in blackoutCells && loc.site().strength < 255) target = loc
-                        finalizeMove(loc, target!!, false, true)
-                    } else {
-                        if (loc.site().strength == 255) {
-                            stillMax += 1
-                        }
-                    }
+                    if (target in blackoutCells && loc.site().strength < 255) target = loc
+
+                    finalizeMove(loc, target!!, false, true)
                 }
 
         gameMap
