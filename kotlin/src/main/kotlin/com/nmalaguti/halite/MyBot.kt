@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySeekerBot"
+val BOT_NAME = "MyAvoidOverkillBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -318,6 +318,8 @@ object MyBot {
             } else if (source != target) {
                 val move = moveTowards(source, target)
 
+                if (target in battleBlackout || (target in blackoutCells && source.site().strength != 255)) logger.warning("target $target in blackout cells")
+
                 if (preventSwaps) {
                     val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
                     if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
@@ -335,6 +337,11 @@ object MyBot {
 
                 if (addToBattleBlackout) battleBlackout.add(source)
                 blackoutCells.add(source)
+
+//                if (source.site().strength == 255) {
+//                    if (target.neighbors().any { it.site().isOtherPlayer() }) battleBlackout.addAll(target.neighbors().filter { it.site().isMine() || (it.site().isEnvironment() && it.site().strength == 0 ) })
+//                    if (target.cornerNeighbors().any { it.site().isOtherPlayer() }) battleBlackout.addAll(target.cornerNeighbors().filter { it.site().isMine() || (it.site().isEnvironment() && it.site().strength == 0 ) })
+//                }
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -390,9 +397,29 @@ object MyBot {
 //                }
 
         gameMap
+                .filter { it.site().isMine() && it.cornerNeighbors().any { it.site().isOtherPlayer() } && it.site().strength > 208 }
+                .forEach { loc ->
+                    if (loc in sources) return@forEach
+
+                    loc.cornerNeighbors()
+                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
+                            .forEach { mine ->
+                                // move away if possible
+                                mine.neighbors()
+                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
+                                        .sortedBy { nextMap.getSite(it).strength }
+                                        .firstOrNull()
+                                        ?.let { target ->
+                                            finalizeMove(mine, target, true, false)
+                                        }
+                            }
+                }
+
+        gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
                 .sortedByDescending { it.site().strength }
+//                .sortedWith(compareBy({ if (it.cornerNeighbors().any { it.site().isOtherPlayer() }) 0 else 1 }, { it.distanceToEnemy() }, { -it.site().strength }))
                 .forEach { loc ->
                     // on the edge of battle
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -411,11 +438,11 @@ object MyBot {
                                     .sortedWith(compareBy(
                                             { -it.site().overkill() },
                                             { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-                                            { -it.site().production },
-                                            { -(it.neighbors().filterNot { it.site().isMine() }.map { it.site().production }.max() ?: 0) },
-                                            { it.distanceToEnemy() },
-                                            { -it.neighbors().filter { it.site().isEnvironment() && it.site().strength == 0 }.size },
-                                            { -it.cornerNeighbors().filter { it.site().isOtherPlayer() }.size }
+                                            { -it.site().production } // ,
+//                                            { -(it.neighbors().filterNot { it.site().isMine() }.map { it.site().production }.max() ?: 0) },
+//                                            { it.distanceToEnemy() },
+//                                            { -it.neighbors().filter { it.site().isEnvironment() && it.site().strength == 0 }.size },
+//                                            { -it.cornerNeighbors().filter { it.site().isOtherPlayer() }.size }
                                     ))
 //                                    .let {
 //                                        it
@@ -502,12 +529,12 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
-                                    { -it.site().overkill() },
-                                    { if (nextMap.getSite(it).isMine()) -it.site().production else 0 },
-                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
-                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
-                                    { it.neighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() },
-                                    { it.cornerNeighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() }
+                                    { -it.site().overkill() } //,
+//                                    { if (nextMap.getSite(it).isMine()) -it.site().production else 0 },
+//                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
+//                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
+//                                    { it.neighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() },
+//                                    { it.cornerNeighbors().filter { it.site().isEnvironment() }.map { it.site().resource() }.average() }
                             ))
 //                            .let {
 //                                it
@@ -550,7 +577,7 @@ object MyBot {
                 }
 
         gameMap
-                .filter { it.isOuterBorder() && nextMap.getSite(it).isEnvironment() }
+                .filter { it.isOuterBorder() && nextMap.getSite(it).isEnvironment() && nextMap.getSite(it).strength > 0 && it !in battleBlackout && it !in blackoutCells}
                 .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -669,14 +696,13 @@ object MyBot {
             if (current !in closedSet) {
                 closedSet.add(current)
 
-                if (current.site().isOtherPlayer()) return grid[current] ?: 0
+                grid[current] = Math.min(grid.getOrPut(current, { 9999 }), current.neighbors().map { grid[it] }.filterNotNull().min()?.plus(1) ?: 9999)
+
+                if (current.site().isOtherPlayer()) return grid[current]!!
 
                 current.neighbors()
                         .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-                        .forEach {
-                            grid[it] = Math.min(grid.getOrPut(it, { 9999 }), grid[current] ?: 0 + 1)
-                            openSet.add(it)
-                        }
+                        .forEach { openSet.add(it) }
             }
         }
 
