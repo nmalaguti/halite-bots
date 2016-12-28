@@ -173,6 +173,47 @@ object MyBot {
                     }
         }
 
+        // deal with traffic and busting through
+
+//        stillMaxCells
+//                .filter { cellsToEnemyGrid[it.y][it.x] < 999 }
+//                .sortedBy { -cellsToEnemyGrid[it.y][it.x] }
+//                .forEach { loc ->
+//                    // walk towards enemy, counting number of
+//                    var current: Location? = loc
+//                    var min = 9999
+//                    var matches = mutableSetOf<Location>()
+//                    while (current != null && cellsToEnemyGrid[current.y][current.x] > 0) {
+//                        val count = countNumber(current)
+//                        if (count.size <= min) {
+//                            matches = count
+//                            min = matches.size
+//                        }
+//
+//                        val currentValue = cellsToEnemyGrid[current.y][current.x]
+//
+//                        current = current.neighbors()
+//                                .filter { cellsToEnemyGrid[it.y][it.x] < currentValue }
+//                                .firstOrNull()
+//                    }
+//
+//                    val numMax = matches
+//                            .flatMap { it.neighborsAndSelf().plus(it.cornerNeighbors()) }.filter { it.site().isMine() && it.site().strength == 255 }
+//                            .distinct()
+//                            .size
+//
+//                    if (numMax / matches.size > 2 || (min < 3 && numMax > 0)) {
+//                        logger.info("stillMax $loc (${cellsToEnemyGrid[loc.y][loc.x]}, $min, ${matches.size}) caused marking width too small for: ${matches.joinToString(", ")}")
+//                        matches
+//                                .flatMap { it.neighbors().plus(it.cornerNeighbors()) }
+//                                .distinct()
+//                                .filter { it.site().isEnvironment() && it.site().strength > 0 }
+//                                .forEach {
+//                                    distanceToEnemyGrid[it.y][it.x] = 0
+//                                }
+//                    }
+//                }
+
         gameMap
                 .filter { it.isOuterBorder() }
                 .sortedBy { distanceToEnemyGrid[it.y][it.x] }
@@ -182,6 +223,28 @@ object MyBot {
                 }
 
         logGrid(distanceToEnemyGrid)
+    }
+
+    fun countNumber(loc: Location): MutableSet<Location> {
+        val number = cellsToEnemyGrid[loc.y][loc.x]
+        val openSet = mutableSetOf(loc)
+        val closedSet = mutableSetOf<Location>()
+        val matches = mutableSetOf<Location>()
+        while (openSet.isNotEmpty()) {
+            val current = openSet.first()
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (cellsToEnemyGrid[current.y][current.x] == number) {
+                    matches.add(current)
+
+                    current.neighbors().plus(current.cornerNeighbors()).forEach { openSet.add(it) }
+                }
+            }
+        }
+
+        return matches
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
