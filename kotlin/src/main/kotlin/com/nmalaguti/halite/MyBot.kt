@@ -22,6 +22,7 @@ object MyBot {
     var cellsToEnemyGrid = mutableListOf<MutableList<Int>>()
     var directedGrid = mapOf<Location, Pair<Int, Int>>()
     var stillMax: Int = 0
+    var stillMaxCells = setOf<Location>()
     var madeContact: Boolean = false
     var numPlayers: Int = 0
     var numConnectedPlayers: Int = 0
@@ -610,9 +611,10 @@ object MyBot {
                             }
                 }
 
-        stillMax = gameMap
+        stillMaxCells = gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
-                .size
+                .toSet()
+        stillMax = stillMaxCells.size
     }
 
     // EXTENSIONS METHODS
