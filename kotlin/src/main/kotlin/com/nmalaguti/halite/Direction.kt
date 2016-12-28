@@ -5,6 +5,14 @@ import java.util.Random
 enum class Direction {
     STILL, NORTH, EAST, SOUTH, WEST;
 
+    fun opposite() = when (this) {
+        NORTH -> SOUTH
+        SOUTH -> NORTH
+        EAST -> WEST
+        WEST -> EAST
+        STILL -> STILL
+    }
+
     companion object {
         val DIRECTIONS = arrayOf(STILL, NORTH, EAST, SOUTH, WEST)
         val CARDINALS = arrayOf(NORTH, EAST, SOUTH, WEST)
