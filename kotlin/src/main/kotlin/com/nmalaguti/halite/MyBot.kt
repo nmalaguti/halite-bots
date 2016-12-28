@@ -169,7 +169,7 @@ object MyBot {
             gameMap
                     .filter { it.site().isEnvironment() && it.site().strength == 0 }
                     .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 2
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 3
                     }
         }
 
@@ -671,55 +671,9 @@ object MyBot {
             this.move(Direction.SOUTH).move(Direction.EAST)
     )
 
-    fun Location.enemies() = this.neighbors().filterNot { it.site().isMine() }
-
-    fun Location.friends() = this.neighbors().filter { it.site().isMine() }
-
     fun Location.move(direction: Direction) = gameMap.getLocation(this, direction)
 
     fun Location.site() = gameMap.getSite(this)
-
-    fun Location.straightClosestEdge(): Direction {
-        val maxDistance = Math.min(gameMap.width, gameMap.height) / 2
-
-        return Direction.CARDINALS.map {
-            var loc = this
-            var distance = 0
-
-            while (loc.site().isMine() && distance < maxDistance) {
-                loc = loc.move(it)
-                distance++
-            }
-
-            it to distance
-        }.sortedBy { it.second }.first().first
-    }
-
-    fun Location.distanceToEnemy(): Int {
-        val openSet = mutableSetOf(this)
-        val closedSet = mutableSetOf<Location>()
-        val grid = mutableMapOf<Location, Int>()
-
-        grid[this] = 0
-
-        while (openSet.isNotEmpty()) {
-            val current = openSet.first()
-            openSet.remove(current)
-            if (current !in closedSet) {
-                closedSet.add(current)
-
-                grid[current] = Math.min(grid.getOrPut(current, { 9999 }), current.neighbors().map { grid[it] }.filterNotNull().min()?.plus(1) ?: 9999)
-
-                if (current.site().isOtherPlayer()) return grid[current]!!
-
-                current.neighbors()
-                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-                        .forEach { openSet.add(it) }
-            }
-        }
-
-        return 9999
-    }
 
     fun Location.allNeighborsWithin(distance: Int) = gameMap.filter { gameMap.getDistance(it, this) <= distance }
 
