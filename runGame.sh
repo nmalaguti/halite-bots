@@ -9,10 +9,43 @@ rm -f *.log* *.hlt
 
 ##########################
 
-./halite -d "35 35" -s 4074769314 \
-    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
-    "tournament/bots/available/orientationbot/run.sh" \
+./halite -d "35 35" \
     "tournament/bots/available/seekerbot/run.sh" \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 2024742149 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 2024742149 \
+#    "tournament/bots/available/seekerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 1622520692 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 1622520692 \
+#    "tournament/bots/available/seekerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 1065657776 \
+#    "tournament/bots/available/seekerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "50 50" -s 1808075107 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/seekerbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "50 50" -s 4040479613 \
+#    "tournament/bots/available/seekerbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
 # lots of prod = 0. good for testing 255 constrained combat
 #./halite -d "35 35" -s 574898733 \

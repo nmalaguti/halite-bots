@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySeekerBot"
+val BOT_NAME = "MyHungryBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -19,10 +19,12 @@ object MyBot {
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
+    var cellsToEnemyGrid = mutableListOf<MutableList<Int>>()
     var directedGrid = mapOf<Location, Pair<Int, Int>>()
     var stillMax: Int = 0
     var madeContact: Boolean = false
     var numPlayers: Int = 0
+    var numConnectedPlayers: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -54,18 +56,19 @@ object MyBot {
 
             lastTurnMoves = allMoves.associateBy { it.loc }
             playerStats = playerStats()
+
             numPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
+            numConnectedPlayers = connectedPlayers().size
+            madeContact = numConnectedPlayers > 1
+
+            logger.info("numPlayers: $numPlayers")
+            logger.info("numConnectedPlayers: $numConnectedPlayers")
+            logger.info("madeContact: $madeContact")
 
             // reset all moves
             allMoves = mutableSetOf()
 
             buildDistanceToEnemyGrid()
-
-            stillMax = 0
-
-            madeContact = gameMap.any {
-                it.site().isEnvironment() && it.site().strength == 0 && it.neighbors().any { it.site().isMine() }
-            }
 
             makeBattleMoves()
 
@@ -77,7 +80,42 @@ object MyBot {
 
     // MOVE LOGIC
 
+    fun connectedPlayers(): Set<Int> {
+        val connectedCells = visitNotEnvironment(gameMap.filter { it.isInnerBorder() }.toMutableSet())
+        return connectedCells.groupBy { it.site().owner }.filterNot { it.key == 0 }.keys
+    }
+
+    fun visitNotEnvironment(openSet: MutableSet<Location>): MutableSet<Location> {
+        val closedSet = mutableSetOf<Location>()
+        while (openSet.isNotEmpty()) {
+            val current = openSet.first()
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                current.neighbors()
+                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                        .forEach { openSet.add(it) }
+            }
+        }
+
+        return closedSet
+    }
+
     fun buildDistanceToEnemyGrid() {
+        cellsToEnemyGrid = mutableListOf<MutableList<Int>>()
+        for (y in 0 until gameMap.height) {
+            val row = mutableListOf<Int>()
+            for (x in 0 until gameMap.width) {
+                row.add(9999)
+            }
+            cellsToEnemyGrid.add(row)
+        }
+
+        walkCellsGridFrom(gameMap.filter { it.site().isOtherPlayer() }.toMutableSet(), mutableSetOf())
+
+        logGrid(cellsToEnemyGrid)
+
         distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
         for (y in 0 until gameMap.height) {
             val row = mutableListOf<Int>()
@@ -180,7 +218,6 @@ object MyBot {
         return minAvg.first.toInt() to minAvg.second.toInt()
     }
 
-
     fun walkGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>): Boolean {
         var changed = false
         while (openSet.isNotEmpty()) {
@@ -196,7 +233,8 @@ object MyBot {
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            if (madeContact && numPlayers != 2) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                            if (madeContact && cellsToEnemyGrid[current.y][current.x] > 3)
+                                                (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                             else 0
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
@@ -211,7 +249,29 @@ object MyBot {
         return changed
     }
 
-    fun logGrid(grid: List<List<Int>>) {
+    fun walkCellsGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
+        while (openSet.isNotEmpty()) {
+            val current = openSet.first()
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (current.site().isOtherPlayer()) {
+                    cellsToEnemyGrid[current.y][current.x] = 0
+                } else {
+                    cellsToEnemyGrid[current.y][current.x] = Math.min(
+                            cellsToEnemyGrid[current.y][current.x],
+                            1 + current.neighbors().map { cellsToEnemyGrid[it.y][it.x] }.filterNotNull().min()!!)
+                }
+
+                current.neighbors()
+                        .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                        .forEach { openSet.add(it) }
+            }
+        }
+    }
+
+    fun logGrid(grid: List<List<Int?>>) {
         val builder = StringBuilder("\n")
         builder.append("     ")
         builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
@@ -366,9 +426,32 @@ object MyBot {
         /////////////////////////////////////////////////////
 
         gameMap
+                .filter {
+                    it.site().isMine() &&
+                            it.cornerNeighbors().any { it.site().isOtherPlayer() } &&
+                            it.site().strength > 208
+                }
+                .forEach { loc ->
+                    if (loc in sources) return@forEach
+
+                    loc.cornerNeighbors()
+                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
+                            .forEach { mine ->
+                                // move away if possible
+                                mine.neighbors()
+                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
+                                        .sortedBy { nextMap.getSite(it).strength }
+                                        .firstOrNull()
+                                        ?.let { target ->
+                                            finalizeMove(mine, target, true, false)
+                                        }
+                            }
+                }
+
+        gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
-                .sortedByDescending { it.site().strength }
+                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it.y][it.x] }))
                 .forEach { loc ->
                     // on the edge of battle
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -415,6 +498,14 @@ object MyBot {
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
+
+                    if (loc.site().strength == 255) {
+                        target.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }.forEach {
+                            if (it.neighbors().none { nextMap.getSite(it).isCombat() || it.site().isOtherPlayer() } && it.cornerNeighbors().any { it.site().isOtherPlayer() }) {
+                                battleBlackout.add(it)
+                            }
+                        }
+                    }
                 }
 
         gameMap
@@ -531,6 +622,8 @@ object MyBot {
     fun Site.isOtherPlayer() = !this.isMine() && !this.isEnvironment()
 
     fun Site.isEnvironment() = this.owner == 0
+
+    fun Site.isCombat() = this.isEnvironment() && this.strength == 0
 
     fun Site.isMine() = this.owner == id
 
