@@ -169,7 +169,7 @@ object MyBot {
             gameMap
                     .filter { it.site().isEnvironment() && it.site().strength == 0 }
                     .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 3
+                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 4
                     }
         }
 
@@ -543,7 +543,9 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
                                     { -it.site().overkill() },
-                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }))
+                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
+                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 }
+                            ))
 //                            .let {
 //                                it
 //                                        .map {
@@ -555,7 +557,9 @@ object MyBot {
 //                                                    if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
 //                                                    if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
 //                                                    -it.site().overkill(),
-//                                                    -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size)
+//                                                    -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
+//                                                    if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1
+//                                            )
 //                                        }
 //                                        .groupBy { it.second }
 //                                        .let {
