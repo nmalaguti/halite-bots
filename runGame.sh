@@ -9,11 +9,34 @@ rm -f *.log* *.hlt
 
 ##########################
 
-./halite -d "35 35" \
-    "tournament/bots/available/seekerbot/run.sh" \
-    "tournament/bots/available/orientationbot/run.sh" \
-    "tournament/bots/available/orientationbot/run.sh" \
-    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+time ./halite -d "50 50" -s 2115962231 "tournament/bots/available/hungrybot/run.sh" \
+
+#./halite -d "35 35" -s 2147595558 \
+#    "tournament/bots/available/hungrybot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 4207771364 \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+#    "tournament/bots/available/hungrybot/run.sh" \
+
+#./halite -d "35 35" -s 2208044740 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 2377537566 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "45 45" -s 1315306766 \
+#    "tournament/bots/available/directedalwaysbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 285533891 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+#    "tournament/bots/available/directedalwaysbot/run.sh" \
 
 #./halite -d "35 35" -s 2024742149 \
 #    "tournament/bots/available/orientationbot/run.sh" \
@@ -31,6 +54,7 @@ rm -f *.log* *.hlt
 #    "tournament/bots/available/seekerbot/run.sh" \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
+# can't win?
 #./halite -d "35 35" -s 1065657776 \
 #    "tournament/bots/available/seekerbot/run.sh" \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \

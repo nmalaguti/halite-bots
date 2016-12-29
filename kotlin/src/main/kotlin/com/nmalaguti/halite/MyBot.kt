@@ -3,11 +3,12 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyHungryBot"
+val BOT_NAME = "MyMoreTiesBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
 val MAXIMUM_STRENGTH = 256
+val DEBUG_TIE_BREAKERS = false
 
 object MyBot {
     lateinit var gameMap: GameMap
@@ -473,29 +474,32 @@ object MyBot {
                                             { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
                                             { -it.site().production }
                                     ))
-//                                    .let {
-//                                        it
-//                                                .map {
-//                                                    it to listOf(
-//                                                            -it.site().overkill(),
-//                                                            -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size,
-//                                                            -it.site().production
-//                                                    )
-//                                                }
-//                                                .groupBy { it.second }
-//                                                .let {
-//                                                    if (it.any { it.value.size > 1 }) {
-//                                                        val builder = StringBuilder()
-//
-//                                                        builder.appendln("combat tie breaker")
-//                                                        it.values.flatten().forEach {
-//                                                            builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-//                                                        }
-//                                                        logger.info(builder.toString())
-//                                                    }
-//                                                }
-//                                        it
-//                                    }
+                                    .let {
+                                        if (DEBUG_TIE_BREAKERS) {
+                                            it
+                                                    .map {
+                                                        it to listOf(
+                                                                -it.site().overkill(),
+                                                                -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size,
+                                                                -it.site().production
+                                                        )
+                                                    }
+                                                    .groupBy { it.second }
+                                                    .let {
+                                                        if (it.any { it.value.size > 1 }) {
+                                                            val builder = StringBuilder()
+
+                                                            builder.appendln("combat tie breaker")
+                                                            it.values.flatten().forEach {
+                                                                builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
+                                                            }
+                                                            logger.info(builder.toString())
+                                                        }
+                                                    }
+                                        }
+
+                                        it
+                                    }
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
@@ -544,37 +548,44 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
-                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 }
+                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
+                                    { if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0 },
+                                    { if (it.site().isMine()) it.site().strength else 0 }
                             ))
-//                            .let {
-//                                it
-//                                        .map {
-//                                            it to listOf(
-//                                                    distanceToEnemyGrid[it.y][it.x],
-//                                                    if (it in directedGrid) directedGrid[it]!!.first else 0,
-//                                                    if (madeContact) 0 else -it.site().production,
-//                                                    if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
-//                                                    if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
-//                                                    if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
-//                                                    -it.site().overkill(),
-//                                                    -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
-//                                                    if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1
-//                                            )
-//                                        }
-//                                        .groupBy { it.second }
-//                                        .let {
-//                                            if (it.any { it.value.size > 1 }) {
-//                                                val builder = StringBuilder()
-//
-//                                                builder.appendln("tie breaker")
-//                                                it.values.flatten().forEach {
-//                                                    builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-//                                                }
-//                                                logger.info(builder.toString())
-//                                            }
-//                                        }
-//                                it
-//                            }
+                            .let {
+                                if (DEBUG_TIE_BREAKERS) {
+                                    it
+                                            .map {
+                                                it to listOf(
+                                                        distanceToEnemyGrid[it.y][it.x],
+                                                        if (it in directedGrid) directedGrid[it]!!.first else 0,
+                                                        if (madeContact) 0 else -it.site().production,
+                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
+                                                        if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
+                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
+                                                        -it.site().overkill(),
+                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
+                                                        if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1,
+                                                        if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0,
+                                                        if (it.site().isMine()) it.site().strength else 0
+                                                )
+                                            }
+                                            .groupBy { it.second }
+                                            .let {
+                                                if (it.any { it.value.size > 1 }) {
+                                                    val builder = StringBuilder()
+
+                                                    builder.appendln("tie breaker")
+                                                    it.values.flatten().forEach {
+                                                        builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
+                                                    }
+                                                    logger.info(builder.toString())
+                                                }
+                                            }
+                                }
+
+                                it
+                            }
                             .firstOrNull()
 
                     if (target != null) {
