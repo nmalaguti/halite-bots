@@ -9,10 +9,25 @@ rm -f *.log* *.hlt
 
 ##########################
 
-time ./halite -d "50 50" -s 2115962231 "tournament/bots/available/hungrybot/run.sh" \
+#time ./halite -d "50 50" -s 2115962231 "tournament/bots/available/hungrybot/run.sh" \
+
+./halite -d "35 35" \
+    "tournament/bots/available/hungrybot/run.sh" \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "tournament/bots/available/directedalwaysbot/run.sh" \
+    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 1349053772 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 2527845333 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
 #./halite -d "35 35" -s 2147595558 \
-#    "tournament/bots/available/hungrybot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
 #./halite -d "35 35" -s 4207771364 \

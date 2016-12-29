@@ -174,57 +174,35 @@ object MyBot {
                     }
         }
 
-        if (!madeContact) {
-            gameMap
-                    .filter {
-                        it.site().isMine() && it.neighbors().filter { it.site().isEnvironment() && it.site().strength > 0 }.size == 3
-                    }
-                    .forEach { loc ->
-//                        loc.neighbors()
-//                                .filter { it.site().isEnvironment() && it.site().strength > 0 }
-//                                .forEach {
-//                                    distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, distanceToEnemyGrid[loc.y][loc.x] - 1)
-//                                }
-
-                        val backwards = loc.neighbors().find { it.site().isMine() }
-                        if (backwards != null) {
-                            loc.neighbors()
-                                    .filter { moveTowards(loc, it).dir == moveTowards(backwards, loc).dir }
-                                    .filter { it.site().strength <= 40 }
-                                    .forEach { loc ->
-                                        distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, distanceToEnemyGrid[loc.y][loc.x] - 1)
-                                    }
-
-//                            loc.cornerNeighbors()
-//                                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
-//                                    .forEach {
-//                                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
-//                                    }
+        gameMap
+                .filter {
+                    it.site().isMine() && it.neighbors().filter { it.site().isEnvironment() && it.site().strength > 0 }.size == 3
+                }
+                .forEach { loc ->
+                    val backwards = loc.neighbors().find { it.site().isMine() }
+                    if (backwards != null) {
+                        val target = loc.move(moveTowards(backwards, loc).dir)
+                        if (target.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 }) {
+                            distanceToEnemyGrid[target.y][target.x] = Math.max(0, distanceToEnemyGrid[target.y][target.x] - 1)
                         }
                     }
+                }
 
-            gameMap
-                    .filter {
-                        it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 2
-                    }
-                    .filter {
-                        val neighbors = it.neighbors().filter { it.site().isMine() }
-                        val a = neighbors[0]
-                        val b = neighbors[1]
+        gameMap
+                .filter {
+                    it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 2
+                }
+                .filter {
+                    val neighbors = it.neighbors().filter { it.site().isMine() }
+                    val a = neighbors[0]
+                    val b = neighbors[1]
 
-                        moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
-                    }
-                    .filter { it.site().strength <= 40 }
-                    .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
-                    }
-
-//            gameMap
-//                    .filter { it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 4 }
-//                    .forEach { loc ->
-//                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] - 1
-//                    }
-        }
+                    moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
+                }
+                .filter { it.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 } }
+                .forEach { loc ->
+                    distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
+                }
 
         // final step
 
