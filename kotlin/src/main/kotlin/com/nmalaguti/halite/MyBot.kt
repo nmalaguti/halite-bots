@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyMoreTiesBot"
+val BOT_NAME = "MySpearBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -173,6 +173,60 @@ object MyBot {
                         distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 4
                     }
         }
+
+        if (!madeContact) {
+            gameMap
+                    .filter {
+                        it.site().isMine() && it.neighbors().filter { it.site().isEnvironment() && it.site().strength > 0 }.size == 3
+                    }
+                    .forEach { loc ->
+//                        loc.neighbors()
+//                                .filter { it.site().isEnvironment() && it.site().strength > 0 }
+//                                .forEach {
+//                                    distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, distanceToEnemyGrid[loc.y][loc.x] - 1)
+//                                }
+
+                        val backwards = loc.neighbors().find { it.site().isMine() }
+                        if (backwards != null) {
+                            loc.neighbors()
+                                    .filter { moveTowards(loc, it).dir == moveTowards(backwards, loc).dir }
+                                    .filter { it.site().strength <= 40 }
+                                    .forEach { loc ->
+                                        distanceToEnemyGrid[loc.y][loc.x] = Math.max(0, distanceToEnemyGrid[loc.y][loc.x] - 1)
+                                    }
+
+//                            loc.cornerNeighbors()
+//                                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
+//                                    .forEach {
+//                                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
+//                                    }
+                        }
+                    }
+
+            gameMap
+                    .filter {
+                        it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 2
+                    }
+                    .filter {
+                        val neighbors = it.neighbors().filter { it.site().isMine() }
+                        val a = neighbors[0]
+                        val b = neighbors[1]
+
+                        moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
+                    }
+                    .filter { it.site().strength <= 40 }
+                    .forEach { loc ->
+                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
+                    }
+
+//            gameMap
+//                    .filter { it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 4 }
+//                    .forEach { loc ->
+//                        distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] - 1
+//                    }
+        }
+
+        // final step
 
         gameMap
                 .filter { it.isOuterBorder() }
