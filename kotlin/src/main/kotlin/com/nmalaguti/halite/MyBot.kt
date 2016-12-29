@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySpearBot"
+val BOT_NAME = "MySpearBot2"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -182,7 +182,7 @@ object MyBot {
                     val backwards = loc.neighbors().find { it.site().isMine() }
                     if (backwards != null) {
                         val target = loc.move(moveTowards(backwards, loc).dir)
-                        if (target.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 }) {
+                        if (target.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 && it.site().resource() <= 7 }) {
                             distanceToEnemyGrid[target.y][target.x] = Math.max(0, distanceToEnemyGrid[target.y][target.x] - 1)
                         }
                     }
@@ -199,7 +199,7 @@ object MyBot {
 
                     moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
                 }
-                .filter { it.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 } }
+                .filter { it.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 && it.site().resource() <= 7 } }
                 .forEach { loc ->
                     distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
                 }
@@ -580,9 +580,7 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
-                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
-                                    { if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0 },
-                                    { if (it.site().isMine()) it.site().strength else 0 }
+                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 }
                             ))
                             .let {
                                 if (DEBUG_TIE_BREAKERS) {
@@ -597,9 +595,7 @@ object MyBot {
                                                         if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
                                                         -it.site().overkill(),
                                                         -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
-                                                        if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1,
-                                                        if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0,
-                                                        if (it.site().isMine()) it.site().strength else 0
+                                                        if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1
                                                 )
                                             }
                                             .groupBy { it.second }
