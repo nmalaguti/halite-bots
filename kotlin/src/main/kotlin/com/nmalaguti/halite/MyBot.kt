@@ -634,7 +634,7 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.overkill() =
-            if (this.isEnvironment() && this.strength > 0) {
+            if (this.isMine() || (this.isEnvironment() && this.strength > 0)) {
                 -distanceToEnemyGrid[this.loc.y][this.loc.x]
             } else {
                 this.loc.neighbors()
