@@ -174,13 +174,9 @@ object MyBot {
                     }
         }
 
-        gameMap
-                .filter { it.isOuterBorder() }
-                .sortedBy { distanceToEnemyGrid[it.y][it.x] }
-                .take(20)
-                .forEach {
-                    walkGridFrom(mutableSetOf(it), mutableSetOf())
-                }
+        // final step
+
+        walkGridFrom(gameMap.filter { it.isOuterBorder() }.toMutableSet())
 
         logGrid(distanceToEnemyGrid)
     }
@@ -220,16 +216,15 @@ object MyBot {
         return minAvg.first.toInt() to minAvg.second.toInt()
     }
 
-    fun walkGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>): Boolean {
-        var changed = false
+    fun walkGridFrom(openSet: MutableSet<Location>) {
+        val closedSet = mutableSetOf<Location>()
         while (openSet.isNotEmpty()) {
-            val current = openSet.first()
+            val current = openSet.minBy { if (it.site().isMine()) it.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min() ?: 9999 else distanceToEnemyGrid[it.y][it.x] }!!
             openSet.remove(current)
             if (current !in closedSet) {
                 closedSet.add(current)
 
                 if (current.site().isMine()) {
-                    val prevValue = distanceToEnemyGrid[current.y][current.x]
                     distanceToEnemyGrid[current.y][current.x] =
                             Math.min(
                                     distanceToEnemyGrid[current.y][current.x],
@@ -239,7 +234,6 @@ object MyBot {
                                                 (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                             else 0
                             )
-                    if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
                 }
 
                 current.neighbors()
@@ -247,8 +241,6 @@ object MyBot {
                         .forEach { openSet.add(it) }
             }
         }
-
-        return changed
     }
 
     fun walkCellsGridFrom(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
