@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyMoreTiesBot"
+val BOT_NAME = "MyLessCruftBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -127,17 +127,21 @@ object MyBot {
             distanceToEnemyGrid.add(row)
         }
 
-        directedGrid = gameMap
-                .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                .map { it to directedWalk(it) }
-                .toMap()
+        if (!madeContact) {
+            directedGrid = gameMap
+                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                    .map { it to directedWalk(it) }
+                    .toMap()
 
-        directedGrid.forEach {
-            val (loc, value) = it
+            directedGrid.forEach {
+                val (loc, value) = it
 
-            if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
-                distanceToEnemyGrid[loc.y][loc.x] = value.second
+                if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
+                    distanceToEnemyGrid[loc.y][loc.x] = value.second
+                }
             }
+        } else {
+            directedGrid = mutableMapOf()
         }
 
         if (stillMax > 1) {
@@ -161,18 +165,37 @@ object MyBot {
                     }
         }
 
-        if (numPlayers == 2) {
-            val lowestValue = gameMap
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                    .map { distanceToEnemyGrid[it.y][it.x] }
-                    .min() ?: 0
-
-            gameMap
-                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
-                    .forEach { loc ->
-                        distanceToEnemyGrid[loc.y][loc.x] = lowestValue / 4
+        gameMap
+                .filter {
+                    it.site().isMine() && it.neighbors().filter { it.site().isEnvironment() && it.site().strength > 0 }.size == 3
+                }
+                .forEach { loc ->
+                    val backwards = loc.neighbors().find { it.site().isMine() }
+                    if (backwards != null) {
+                        val target = loc.move(moveTowards(backwards, loc).dir)
+                        if (target.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 }) {
+                            distanceToEnemyGrid[target.y][target.x] = Math.max(0, distanceToEnemyGrid[target.y][target.x] - 1)
+                        }
                     }
-        }
+                }
+
+        gameMap
+                .filter {
+                    it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 2
+                }
+                .filter {
+                    val neighbors = it.neighbors().filter { it.site().isMine() }
+                    val a = neighbors[0]
+                    val b = neighbors[1]
+
+                    moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
+                }
+                .filter { it.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 } }
+                .forEach { loc ->
+                    distanceToEnemyGrid[loc.y][loc.x] = distanceToEnemyGrid[loc.y][loc.x] + 1
+                }
+
+        // final step
 
         gameMap
                 .filter { it.isOuterBorder() }
@@ -210,7 +233,7 @@ object MyBot {
             currLoc.neighbors()
                     .filter { it.site().isEnvironment() && it.site().strength > 0 }
                     .forEach {
-                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + if (madeContact) 4 else 3)))
+                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + 3)))
                         val currValue = locToValue.getOrPut(it, { dist to nextValue }).second
                         if (nextValue < currValue) locToValue[it] = dist to nextValue
                         queue.addLast(it)
@@ -235,8 +258,8 @@ object MyBot {
                                     distanceToEnemyGrid[current.y][current.x],
                                     1 +
                                             current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
-                                            if (madeContact && cellsToEnemyGrid[current.y][current.x] > 3)
-                                                (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                            if (madeContact)
+                                                (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0)) - Math.max(0, 2 - cellsToEnemyGrid[current.y][current.x])).toInt())
                                             else 0
                             )
                     if (prevValue != distanceToEnemyGrid[current.y][current.x]) changed = true
@@ -428,29 +451,6 @@ object MyBot {
         /////////////////////////////////////////////////////
 
         gameMap
-                .filter {
-                    it.site().isMine() &&
-                            it.cornerNeighbors().any { it.site().isOtherPlayer() } &&
-                            it.site().strength > 208
-                }
-                .forEach { loc ->
-                    if (loc in sources) return@forEach
-
-                    loc.cornerNeighbors()
-                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
-                            .forEach { mine ->
-                                // move away if possible
-                                mine.neighbors()
-                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
-                                        .sortedBy { nextMap.getSite(it).strength }
-                                        .firstOrNull()
-                                        ?.let { target ->
-                                            finalizeMove(mine, target, true, false)
-                                        }
-                            }
-                }
-
-        gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
                 .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it.y][it.x] }))
@@ -503,14 +503,6 @@ object MyBot {
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
-
-                    if (loc.site().strength == 255) {
-                        target.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }.forEach {
-                            if (it.neighbors().none { nextMap.getSite(it).isCombat() || it.site().isOtherPlayer() } && it.cornerNeighbors().any { it.site().isOtherPlayer() }) {
-                                battleBlackout.add(it)
-                            }
-                        }
-                    }
                 }
 
         gameMap
@@ -547,10 +539,7 @@ object MyBot {
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0 },
                                     { -it.site().overkill() },
-                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size },
-                                    { if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1 },
-                                    { if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0 },
-                                    { if (it.site().isMine()) it.site().strength else 0 }
+                                    { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }
                             ))
                             .let {
                                 if (DEBUG_TIE_BREAKERS) {
@@ -564,10 +553,7 @@ object MyBot {
                                                         if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
                                                         if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
                                                         -it.site().overkill(),
-                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size,
-                                                        if (loc.neighbors().filter { it.site().isMine() }.size == 1 && moveTowards(loc, it).dir == moveTowards(loc.neighbors().first { it.site().isMine() }, loc).dir) 0 else 1,
-                                                        if (it.site().isMine()) cellsToEnemyGrid[it.y][it.x] else 0,
-                                                        if (it.site().isMine()) it.site().strength else 0
+                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size
                                                 )
                                             }
                                             .groupBy { it.second }
