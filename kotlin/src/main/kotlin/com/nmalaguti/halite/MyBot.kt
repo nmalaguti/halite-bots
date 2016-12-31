@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyExpeditionBot"
+val BOT_NAME = "MyTravelerBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -31,6 +31,7 @@ object MyBot {
     var hotSpots = setOf<Location>()
     var hotSpotsGrid = mutableListOf<MutableList<Int>>()
     var useHotSpots = true
+    var localProduction: Double = 0.0
 
     fun init() {
         val init = Networking.getInit()
@@ -57,16 +58,91 @@ object MyBot {
 
         if (useHotSpots) {
             walkHotSpots(hotSpots.toMutableSet(), mutableSetOf())
-            logger.info("using hot spots:")
             logGrid(hotSpotsGrid)
         }
 
         val myLocation = gameMap.find { it.site().isMine() }
-        if (myLocation != null) {
-            useHotSpots = myLocation.neighbors().all { hotSpotsGrid[it.y][it.x] > 60 }
+        if (useHotSpots && myLocation != null) {
+            var distance = 0
+            var count = hotSpots.size
+
+            while (count > 0) {
+                distance++
+                count -= (4 * distance)
+            }
+
+            localProduction = myLocation.allNeighborsWithin(Math.min(4, distance)).map { it.site().production }.average()
+            val hotSpotProduction = hotSpots.map { it.site().production }.average()
+
+            logger.info("distance: $distance")
+            logger.info("localProduction: $localProduction")
+            logger.info("hotSpotProduction: $hotSpotProduction")
+
+            if (hotSpotProduction < localProduction) useHotSpots = false
         }
 
+        logger.info("using hot spots: $useHotSpots")
+
         Networking.sendInit(BOT_NAME)
+    }
+
+    fun findHotSpots(): Set<Location> {
+        // build list of siding window images
+
+        val grid = gameMap.contents.plus(gameMap.contents)
+
+        logger.info("average: ${gameMap.map { it.site().resource() }.average()}")
+
+        (Math.min(15, Math.min(gameMap.width, gameMap.height)) downTo 5).forEach { windowSize ->
+            (2..5).forEach { minimumValue ->
+                val hotSpots = (0 until gameMap.height)
+                        .flatMap { y ->
+                            (0 until gameMap.width)
+                                    .flatMap { x ->
+                                        val window = grid
+                                                .subList(y, y + windowSize)
+                                                .map { it.plus(it).subList(x, x + windowSize) }
+                                                .flatten()
+
+                                        val avg = window.map { (if (it.isMine()) 0 else it.resource()) }.average()
+                                        window.filter { (if (it.isMine()) 0 else it.resource()) < minimumValue }.map { it.loc to avg }
+                                    }
+                        }
+                        .filter { it.second < minimumValue }
+                        .map {
+                            it.first
+                        }
+                        .toSet()
+
+                if (hotSpots.isNotEmpty()) {
+                    logger.info("windowSize: $windowSize, minimumValue: $minimumValue, num: ${hotSpots.size}")
+                    return hotSpots
+                }
+            }
+        }
+
+        return emptySet()
+    }
+
+    fun walkHotSpots(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
+        while (openSet.isNotEmpty()) {
+            val current = openSet.minBy { it.neighborsAndSelf().map { hotSpotsGrid[it.y][it.x] }.min()!! }!!
+            openSet.remove(current)
+            if (current !in closedSet) {
+                closedSet.add(current)
+
+                if (current.site().isEnvironment() && current.site().strength > 0) {
+                    hotSpotsGrid[current.y][current.x] = Math.min(
+                            hotSpotsGrid[current.y][current.x],
+                            current.site().resource() +
+                                    current.neighbors().map { hotSpotsGrid[it.y][it.x] }.min()!!)
+                }
+
+                current.neighbors()
+                        .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                        .forEach { openSet.add(it) }
+            }
+        }
     }
 
     fun endGameLoop() {
@@ -115,56 +191,6 @@ object MyBot {
     }
 
     // MOVE LOGIC
-
-    fun findHotSpots(): Set<Location> {
-        // build list of siding window images
-
-        val windowSize = 5
-        val minimumValue = 5
-        val grid = gameMap.contents.plus(gameMap.contents)
-
-        logger.info("average: ${gameMap.map { it.site().resource() }.average()}")
-
-        return (0 until gameMap.height)
-                .flatMap { y ->
-                    (0 until gameMap.width)
-                            .flatMap { x ->
-                                val window = grid
-                                        .subList(y, y + windowSize)
-                                        .map { it.plus(it).subList(x, x + windowSize) }
-                                        .flatten()
-
-                                val avg = window.map { it.resource() }.average()
-                                window.filter { it.resource() < minimumValue }.map { it.loc to avg }
-                            }
-                }
-                .filter { it.second < minimumValue }
-                .map {
-                    it.first
-                }
-                .toSet()
-    }
-
-    fun walkHotSpots(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
-        while (openSet.isNotEmpty()) {
-            val current = openSet.minBy { it.neighborsAndSelf().map { hotSpotsGrid[it.y][it.x] }.min()!! }!!
-            openSet.remove(current)
-            if (current !in closedSet) {
-                closedSet.add(current)
-
-                if (current.site().isEnvironment() && current.site().strength > 0) {
-                    hotSpotsGrid[current.y][current.x] = Math.min(
-                            hotSpotsGrid[current.y][current.x],
-                            current.site().resource() +
-                                    current.neighbors().map { hotSpotsGrid[it.y][it.x] }.min()!!)
-                }
-
-                current.neighbors()
-                        .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                        .forEach { openSet.add(it) }
-            }
-        }
-    }
 
     fun connectedPlayers(): Set<Int> {
         val connectedCells = visitNotEnvironment(gameMap.filter { it.isInnerBorder() }.toMutableSet())
@@ -215,7 +241,7 @@ object MyBot {
 
         logGrid(cellsToBorderGrid)
 
-        if (!madeContact && useHotSpots && gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it.y][it.x] }.min() ?: 200 < 200) {
+        if (!madeContact && useHotSpots && gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it.y][it.x] }.min() ?: 0 < (1000 / localProduction)) {
             distanceToEnemyGrid = hotSpotsGrid
         } else {
             distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
@@ -394,7 +420,7 @@ object MyBot {
         for (y in 0 until gameMap.height) {
             builder.append("$y".take(3).padEnd(4) + " ")
             builder.append(grid[y].mapIndexed { x, it ->
-                val value = if (Location(x, y).site().isMine() && it != null) it.toDouble() else it
+                val value: Any? = if (Location(x, y).site().isMine() && it != null) it.toDouble() else it
                 "$value".take(3).padEnd(4) }.joinToString(" ")
             )
             builder.append(" " + "$y".take(3).padEnd(4))
@@ -544,6 +570,29 @@ object MyBot {
         /////////////////////////////////////////////////////
 
         gameMap
+                .filter {
+                    it.site().isMine() &&
+                            it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 } &&
+                            it.site().strength == 255
+                }
+                .forEach { loc ->
+                    if (loc in sources) return@forEach
+
+                    loc.cornerNeighbors()
+                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
+                            .forEach { mine ->
+                                // move away if possible
+                                mine.neighbors()
+                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
+                                        .sortedBy { nextMap.getSite(it).strength }
+                                        .firstOrNull()
+                                        ?.let { target ->
+                                            finalizeMove(mine, target, true, false)
+                                        }
+                            }
+                }
+
+        gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
                 .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it.y][it.x] }))
@@ -596,6 +645,14 @@ object MyBot {
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
+
+                    if (loc.site().strength == 255) {
+                        target.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }.forEach {
+                            if (it.neighbors().none { nextMap.getSite(it).isCombat() || it.site().isOtherPlayer() } && it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 }) {
+                                battleBlackout.add(it)
+                            }
+                        }
+                    }
                 }
 
         gameMap
@@ -621,8 +678,6 @@ object MyBot {
                                 } else {
                                     // mine
                                     loc.site().strength > Math.min(128, Math.max(loc.site().production * (Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5), minimumStrength)) &&
-//                                    loc.site().strength > Math.max(loc.site().production * Math.min(9, Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5), (minimumStrength * (Math.min(9, Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5) / 5.0)).toInt()) &&
-//                                    loc.site().strength > Math.max(loc.site().production * 5, minimumStrength) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -726,7 +781,7 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.overkill() =
-            if (this.isMine() || (this.isEnvironment() && this.strength > 0)) {
+            if ((this.isEnvironment() && this.strength > 0)) {
                 -distanceToEnemyGrid[this.loc.y][this.loc.x]
             } else {
                 this.loc.neighbors()
