@@ -5,6 +5,7 @@ import kotlin.comparisons.compareBy
 
 val BOT_NAME = "MyTravelerBot"
 val MAXIMUM_TIME = 940 // ms
+val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
 val MAXIMUM_STRENGTH = 256
@@ -17,6 +18,7 @@ object MyBot {
     var turn: Int = 0
     var allMoves = mutableSetOf<Move>()
     var start = System.currentTimeMillis()
+    var startInit = System.currentTimeMillis()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
     var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
@@ -95,6 +97,8 @@ object MyBot {
 
         (Math.min(15, Math.min(gameMap.width, gameMap.height)) downTo 5).forEach { windowSize ->
             (2..5).forEach { minimumValue ->
+                if (System.currentTimeMillis() - startInit > MAXIMUM_INIT_TIME) return emptySet()
+
                 val hotSpots = (0 until gameMap.height)
                         .flatMap { y ->
                             (0 until gameMap.width)
@@ -126,6 +130,11 @@ object MyBot {
 
     fun walkHotSpots(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
         while (openSet.isNotEmpty()) {
+            if (System.currentTimeMillis() - startInit > MAXIMUM_INIT_TIME) {
+                useHotSpots = false
+                return
+            }
+
             val current = openSet.minBy { it.neighborsAndSelf().map { hotSpotsGrid[it.y][it.x] }.min()!! }!!
             openSet.remove(current)
             if (current !in closedSet) {
@@ -576,6 +585,8 @@ object MyBot {
                             it.site().strength == 255
                 }
                 .forEach { loc ->
+                    if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
+
                     if (loc in sources) return@forEach
 
                     loc.cornerNeighbors()
@@ -796,7 +807,7 @@ object MyBot {
             }
 
     fun Site.resource() = if (!this.isMine()) {
-        if (this.production == 0) 9999
+        if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
         else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
