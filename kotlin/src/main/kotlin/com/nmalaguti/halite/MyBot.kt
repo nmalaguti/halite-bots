@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBruiserBot"
+val BOT_NAME = "MyBoxerBot"
 val MAXIMUM_TIME = 940 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
@@ -307,7 +307,7 @@ object MyBot {
         for (y in 0 until gameMap.height) {
             builder.append("$y".take(3).padEnd(4) + " ")
             builder.append(grid[y].mapIndexed { x, it ->
-                val value = if (Location(x, y).site().isMine() && it != null) it.toDouble() else it
+                val value: Any? = if (Location(x, y).site().isMine() && it != null) it.toDouble() else it
                 "$value".take(3).padEnd(4) }.joinToString(" ")
             )
             builder.append(" " + "$y".take(3).padEnd(4))
@@ -457,6 +457,29 @@ object MyBot {
         /////////////////////////////////////////////////////
 
         gameMap
+                .filter {
+                    it.site().isMine() &&
+                            it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 } &&
+                            it.site().strength == 255
+                }
+                .forEach { loc ->
+                    if (loc in sources) return@forEach
+
+                    loc.cornerNeighbors()
+                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
+                            .forEach { mine ->
+                                // move away if possible
+                                mine.neighbors()
+                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
+                                        .sortedBy { nextMap.getSite(it).strength }
+                                        .firstOrNull()
+                                        ?.let { target ->
+                                            finalizeMove(mine, target, true, false)
+                                        }
+                            }
+                }
+
+        gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
                 .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it.y][it.x] }))
@@ -509,6 +532,14 @@ object MyBot {
                                     .firstOrNull() ?: loc
 
                     finalizeMove(loc, target, true, false)
+
+                    if (loc.site().strength == 255) {
+                        target.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }.forEach {
+                            if (it.neighbors().none { nextMap.getSite(it).isCombat() || it.site().isOtherPlayer() } && it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 }) {
+                                battleBlackout.add(it)
+                            }
+                        }
+                    }
                 }
 
         gameMap
@@ -534,8 +565,6 @@ object MyBot {
                                 } else {
                                     // mine
                                     loc.site().strength > Math.min(128, Math.max(loc.site().production * (Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5), minimumStrength)) &&
-//                                    loc.site().strength > Math.max(loc.site().production * Math.min(9, Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5), (minimumStrength * (Math.min(9, Math.max(0, cellsToBorderGrid[loc.y][loc.x] - 2) + 5) / 5.0)).toInt()) &&
-//                                    loc.site().strength > Math.max(loc.site().production * 5, minimumStrength) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -639,7 +668,7 @@ object MyBot {
     fun Site.isMine() = this.owner == id
 
     fun Site.overkill() =
-            if (this.isMine() || (this.isEnvironment() && this.strength > 0)) {
+            if ((this.isEnvironment() && this.strength > 0)) {
                 -distanceToEnemyGrid[this.loc.y][this.loc.x]
             } else {
                 this.loc.neighbors()
