@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyStepIncreaseBot"
+val BOT_NAME = "MySpartanBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -35,7 +35,6 @@ object MyBot {
     var useHotSpots = true
     var localProduction: Double = 0.0
     var strengthNeededGrid = mutableListOf<MutableList<Int>>()
-    var stepSizeGrid = mutableListOf<MutableList<Int>>()
     var minimumStrength = 0
 
     fun init() {
@@ -88,8 +87,6 @@ object MyBot {
 
         val allHotSpots = mutableSetOf<Location>()
         val grid = gameMap.contents.plus(gameMap.contents)
-
-        logger.info("average: ${gameMap.map { it.site().resource() }.average()}")
 
         (Math.min(15, Math.min(gameMap.width, gameMap.height)) downTo 5).forEach { windowSize ->
             (2..5).forEach { minimumValue ->
@@ -275,11 +272,9 @@ object MyBot {
 
         // final step
 
-        stepSizeGrid = initializeGrid { 1 }
-
-        val gridCopy = distanceToEnemyGrid.map { it.toMutableList() }.toMutableList()
-
         walkDistanceToEnemyGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
+
+        logGrid(distanceToEnemyGrid, "distanceToEnemyGrid")
 
         minimumStrength = calculateMinimumStrength()
         logger.info("minimum strength: $minimumStrength")
@@ -293,14 +288,8 @@ object MyBot {
             } else 9999
         }
 
-        if (!madeContact) {
-            walkStrengthNeededGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
+        if (!madeContact) walkStrengthNeededGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
 
-            distanceToEnemyGrid = gridCopy
-            walkDistanceToEnemyGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
-        }
-
-        logGrid(distanceToEnemyGrid, "distanceToEnemyGrid")
         logGrid(strengthNeededGrid, "strengthNeededGrid")
     }
 
@@ -377,7 +366,7 @@ object MyBot {
                         distanceToEnemyGrid[current.y][current.x] =
                                 Math.min(
                                         distanceToEnemyGrid[current.y][current.x],
-                                        stepSizeGrid[current.y][current.x] +
+                                        1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
                                                 if (madeContact)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
@@ -453,8 +442,6 @@ object MyBot {
                                     strengthNeededGrid[target.y][target.x] = Math.max(0, strengthNeededGrid[target.y][target.x] - current.site().strength)
 
                                     productionLocations.add(current)
-                                } else {
-                                    if (cellsToBorderGrid[current.y][current.x] > 2) stepSizeGrid[current.y][current.x] = cellsToBorderGrid[current.y][current.x]
                                 }
                             }
                         }
@@ -577,7 +564,7 @@ object MyBot {
 
                 allMoves.add(move)
 
-                if (addToBattleBlackout && source.site().strength == 255 && target.neighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 }) battleBlackout.add(source)
+                if (addToBattleBlackout) battleBlackout.add(source)
                 blackoutCells.add(source)
 
                 sources.put(source, move.dir)
