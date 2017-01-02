@@ -11,6 +11,26 @@ rm -f *.log* *.hlt
 
 #time ./halite -d "50 50" -s 2115962231 "tournament/bots/available/hungrybot/run.sh" \
 
+
+# 3418377502
+# 3770836417
+
+./halite -d "35 35" -s 3418377502 \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "tournament/bots/available/orientationbot/run.sh" \
+    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 2155077429 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "35 35" -s 934448538 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
 # TO INVESTIGATE
 # https://halite.io/game.php?replay=ar1483315205-1005180436.hlt
 # https://halite.io/game.php?replay=ar1483311296-1391725357.hlt
