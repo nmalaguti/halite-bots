@@ -11,17 +11,69 @@ rm -f *.log* *.hlt
 
 #time ./halite -d "50 50" -s 2115962231 "tournament/bots/available/hungrybot/run.sh" \
 
-# 3293006875 36x39 6 player
+# TO INVESTIGATE
+# https://halite.io/game.php?replay=ar1483315205-1005180436.hlt
+# https://halite.io/game.php?replay=ar1483311296-1391725357.hlt
+# https://halite.io/game.php?replay=ar1483317151-2951660361.hlt
+# https://halite.io/game.php?replay=ar1483320146-1651591812.hlt
+# https://halite.io/game.php?replay=ar1483319903-1408168050.hlt
 
-# 1453688132
+# didn't get there fast enough
+# https://halite.io/game.php?replay=ar1483315205-1005180436.hlt
+#./halite -d "45 45" -s 1005180436 \
+#    "tournament/bots/available/travelerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
 
-# 2450080576
+# should have stopped earlier - don't know if that would have saved things
+# https://halite.io/game.php?replay=ar1483312320-2415499296.hlt
+#./halite -d "35 35" -s 2415499296 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
-./halite -d "40 40" -s 1577469022 \
-    "tournament/bots/available/orientationbot/run.sh" \
-    "tournament/bots/available/thugbot/run.sh" \
-    "tournament/bots/available/lesscruftbot/run.sh" \
-    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+# traveled way too far
+# https://halite.io/game.php?replay=ar1483318207-4007485397.hlt
+#./halite -d "45 45" -s 4007485397 \
+#    "tournament/bots/available/travelerbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# shouldn't have won, my early expansion was bad
+# https://halite.io/game.php?replay=ar1483304169-2854665850.hlt
+#./halite -d "35 35" -s 2854665850 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# don't know why I didn't go after the hot spot
+# https://halite.io/game.php?replay=ar1483317722-3522689094.hlt
+# NOT FIXED
+#./halite -d "40 40" -s 3522689094 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# should go after near term goals?
+# https://halite.io/game.php?replay=ar1483303249-1934049587.hlt
+#./halite -d "40 40" -s 1934049587 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+# fix global vs local
+# https://halite.io/game.php?replay=ar1483303113-1798668336.hlt
+#./halite -d "40 40" -s 1798668336 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "40 40" -s 1577469022 \
+#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/thugbot/run.sh" \
+#    "tournament/bots/available/lesscruftbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
 #./halite -d "30 30" \
 #    "tournament/bots/available/orientationbot/run.sh" \
@@ -104,7 +156,7 @@ rm -f *.log* *.hlt
 
 #./halite -d "36 39" -s 3293006875 \
 #    "tournament/bots/available/orientationbot/run.sh" \
-#    "tournament/bots/available/orientationbot/run.sh" \
+#    "tournament/bots/available/travelerbot/run.sh" \
 #    "tournament/bots/available/orientationbot/run.sh" \
 #    "tournament/bots/available/orientationbot/run.sh" \
 #    "tournament/bots/available/orientationbot/run.sh" \

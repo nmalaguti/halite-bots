@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyTravelerBot"
+val BOT_NAME = "MyWarriorBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -34,6 +34,7 @@ object MyBot {
     var hotSpotsGrid = mutableListOf<MutableList<Int>>()
     var useHotSpots = true
     var localProduction: Double = 0.0
+    var hotSpotResourceAverage: Int = 0
 
     fun init() {
         val init = Networking.getInit()
@@ -75,6 +76,7 @@ object MyBot {
 
             localProduction = myLocation.allNeighborsWithin(Math.min(4, distance)).map { it.site().production }.average()
             val hotSpotProduction = hotSpots.map { it.site().production }.average()
+            hotSpotResourceAverage = hotSpots.map { it.site().resource() }.average().toInt()
 
             logger.info("distance: $distance")
             logger.info("localProduction: $localProduction")
@@ -91,13 +93,14 @@ object MyBot {
     fun findHotSpots(): Set<Location> {
         // build list of siding window images
 
+        val allHotSpots = mutableSetOf<Location>()
         val grid = gameMap.contents.plus(gameMap.contents)
 
         logger.info("average: ${gameMap.map { it.site().resource() }.average()}")
 
-        (Math.min(15, Math.min(gameMap.width, gameMap.height)) downTo 5).forEach { windowSize ->
+        (5..Math.min(15, Math.min(gameMap.width, gameMap.height))).forEach { windowSize ->
             (2..5).forEach { minimumValue ->
-                if (System.currentTimeMillis() - startInit > MAXIMUM_INIT_TIME) return emptySet()
+                if (System.currentTimeMillis() - startInit > MAXIMUM_INIT_TIME) return allHotSpots
 
                 val hotSpots = (0 until gameMap.height)
                         .flatMap { y ->
@@ -120,12 +123,12 @@ object MyBot {
 
                 if (hotSpots.isNotEmpty()) {
                     logger.info("windowSize: $windowSize, minimumValue: $minimumValue, num: ${hotSpots.size}")
-                    return hotSpots
+                    allHotSpots.addAll(hotSpots)
                 }
             }
         }
 
-        return emptySet()
+        return allHotSpots
     }
 
     fun walkHotSpots(openSet: MutableSet<Location>, closedSet: MutableSet<Location>) {
@@ -186,7 +189,7 @@ object MyBot {
             // reset all moves
             allMoves = mutableSetOf()
 
-            if (useHotSpots && hotSpots.any { it.site().isMine() }) useHotSpots = false
+            if (useHotSpots && (hotSpots.any { !it.site().isEnvironment() } || gameMap.filter { it.isOuterBorder() && it.neighbors().any { it.site().isOtherPlayer() } }.isNotEmpty())) useHotSpots = false
             logger.info("useHotSpots: $useHotSpots")
 
             buildDistanceToEnemyGrid()
@@ -250,51 +253,54 @@ object MyBot {
 
         logGrid(cellsToBorderGrid)
 
-        if (!madeContact && useHotSpots && gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it.y][it.x] }.min() ?: 0 < (1000 / localProduction)) {
-            distanceToEnemyGrid = hotSpotsGrid
-        } else {
-            distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
-            for (y in 0 until gameMap.height) {
-                val row = mutableListOf<Int>()
-                for (x in 0 until gameMap.width) {
-                    row.add(Location(x, y).site().resource())
-                }
-                distanceToEnemyGrid.add(row)
+        distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
+        for (y in 0 until gameMap.height) {
+            val row = mutableListOf<Int>()
+            for (x in 0 until gameMap.width) {
+                row.add(Location(x, y).site().resource())
             }
+            distanceToEnemyGrid.add(row)
+        }
 
-            directedGrid = gameMap
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                    .map { it to directedWalk(it) }
-                    .toMap()
+        directedGrid = gameMap
+                .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                .map { it to directedWalk(it) }
+                .toMap()
 
-            directedGrid.forEach {
-                val (loc, value) = it
+        directedGrid.forEach {
+            val (loc, value) = it
 
-                if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
-                    distanceToEnemyGrid[loc.y][loc.x] = value.second
-                }
+            if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
+                distanceToEnemyGrid[loc.y][loc.x] = value.second
             }
+        }
 
 
-            if (stillMax > 1) {
-                gameMap
-                        .filter { it.site().isEnvironment() && it.site().strength == 0 }
-                        .forEach { loc ->
-                            val owners = loc.neighbors()
+        if (stillMax > 1) {
+            gameMap
+                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
+                    .forEach { loc ->
+                        val owners = loc.neighbors()
 
-                            val combatCells = owners.filter { it.site().isEnvironment() && it.site().strength == 0 }
-                            val environmentCells = owners.filter { it.site().isEnvironment() && it.site().strength > 0 }
-                            val otherPlayerCells = owners.filter { it.site().isOtherPlayer() }
-                            val myCells = owners.filter { it.site().isMine() }
+                        val combatCells = owners.filter { it.site().isEnvironment() && it.site().strength == 0 }
+                        val environmentCells = owners.filter { it.site().isEnvironment() && it.site().strength > 0 }
+                        val otherPlayerCells = owners.filter { it.site().isOtherPlayer() }
+                        val myCells = owners.filter { it.site().isMine() }
 
-                            if (myCells.isNotEmpty() && otherPlayerCells.isNotEmpty() && combatCells.isEmpty() && environmentCells.size == 2) {
-                                if (otherPlayerCells.map { it.site().owner }.all { playerStats[it]?.strength ?: 0 < playerStats[id]?.strength ?: 0 }) {
-                                    environmentCells.forEach {
-                                        distanceToEnemyGrid[it.y][it.x] = 0
-                                    }
+                        if (myCells.isNotEmpty() && otherPlayerCells.isNotEmpty() && combatCells.isEmpty() && environmentCells.size == 2) {
+                            if (otherPlayerCells.map { it.site().owner }.all { playerStats[it]?.strength ?: 0 < playerStats[id]?.strength ?: 0 }) {
+                                environmentCells.forEach {
+                                    distanceToEnemyGrid[it.y][it.x] = 0
                                 }
                             }
                         }
+                    }
+        }
+
+        if (!madeContact && useHotSpots && gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it.y][it.x] }.min() ?: 0 < (1000 / localProduction)) {
+            val bestHotSpot = gameMap.filter { it.isOuterBorder() }.minBy { hotSpotsGrid[it.y][it.x] }
+            if (bestHotSpot != null) {
+                distanceToEnemyGrid[bestHotSpot.y][bestHotSpot.x] = Math.max(0, hotSpotResourceAverage)
             }
         }
 
