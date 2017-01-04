@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySpartanBot"
+val BOT_NAME = "MyCompressBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -268,6 +268,31 @@ object MyBot {
                                 }
                             }
                         }
+            }
+
+            if (!madeContact) {
+                val outerBorder = gameMap
+                        .filter { it.isOuterBorder() }
+                        .filter { distanceToEnemyGrid[it] < MAXIMUM_STRENGTH }
+
+                val outerBorderValues = outerBorder.map { distanceToEnemyGrid[it] }
+
+                val min = outerBorderValues.min()
+                val max = outerBorderValues.max()
+
+                if (min != null && max != null) {
+                    val range = max - min
+                    val result = range / Math.min(20.0, range.toDouble())
+
+                    logger.info("max: $max, min: $min, range: $range, result: $result")
+
+                    if (range > 0) {
+                        outerBorder.forEach {
+                            if (distanceToEnemyGrid[it] == min) distanceToEnemyGrid[it] = 0
+                            else distanceToEnemyGrid[it] = ((distanceToEnemyGrid[it] - min) / result).toInt() + 1
+                        }
+                    }
+                }
             }
         }
 
