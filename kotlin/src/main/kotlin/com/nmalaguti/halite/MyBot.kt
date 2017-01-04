@@ -21,9 +21,9 @@ object MyBot {
     var startInit = System.currentTimeMillis()
     var lastTurnMoves: Map<Location, Move> = mapOf()
     var playerStats: Map<Int, Stats> = mapOf()
-    var distanceToEnemyGrid = mutableListOf<MutableList<Int>>()
-    var cellsToEnemyGrid = mutableListOf<MutableList<Int>>()
-    var cellsToBorderGrid = mutableListOf<MutableList<Int>>()
+    lateinit var distanceToEnemyGrid: Grid
+    lateinit var cellsToEnemyGrid: Grid
+    lateinit var cellsToBorderGrid: Grid
     var directedGrid = mapOf<Location, Pair<Int, Int>>()
     var stillMax: Int = 0
     var stillMaxCells = setOf<Location>()
@@ -31,10 +31,10 @@ object MyBot {
     var numPlayers: Int = 0
     var numConnectedPlayers: Int = 0
     var hotSpots = setOf<Location>()
-    var hotSpotsGrid = mutableListOf<MutableList<Int>>()
+    lateinit var hotSpotsGrid: Grid
     var useHotSpots = true
     var localProduction: Double = 0.0
-    var strengthNeededGrid = mutableListOf<MutableList<Int>>()
+    lateinit var strengthNeededGrid: Grid
     var minimumStrength = 0
 
     fun init() {
@@ -45,7 +45,7 @@ object MyBot {
         logger.info("id: $id")
 
         hotSpots = findHotSpots()
-        hotSpotsGrid = initializeGrid {
+        hotSpotsGrid = Grid {
             if (it in hotSpots) 0
             else 9999
         }
@@ -129,16 +129,16 @@ object MyBot {
                 return
             }
 
-            val current = openSet.minBy { it.neighborsAndSelf().map { hotSpotsGrid[it.y][it.x] }.min()!! }!!
+            val current = openSet.minBy { it.neighborsAndSelf().map { hotSpotsGrid[it] }.min()!! }!!
             openSet.remove(current)
             if (current !in closedSet) {
                 closedSet.add(current)
 
                 if (current.site().isEnvironment() && current.site().strength > 0) {
-                    hotSpotsGrid[current.y][current.x] = Math.min(
-                            hotSpotsGrid[current.y][current.x],
+                    hotSpotsGrid[current] = Math.min(
+                            hotSpotsGrid[current],
                             current.site().resource() +
-                                    current.neighbors().map { hotSpotsGrid[it.y][it.x] }.min()!!)
+                                    current.neighbors().map { hotSpotsGrid[it] }.min()!!)
                 }
 
                 current.neighbors()
@@ -165,6 +165,7 @@ object MyBot {
 
             start = System.currentTimeMillis()
             logger.info("===== Turn: ${turn++} at $start =====")
+            logger.info("stats: ${playerStats[id]}")
 
             lastTurnMoves = allMoves.associateBy { it.loc }
             playerStats = playerStats()
@@ -218,22 +219,22 @@ object MyBot {
     }
 
     fun buildDistanceToEnemyGrid() {
-        cellsToEnemyGrid = initializeGrid { 9999 }
+        cellsToEnemyGrid = Grid { 9999 }
         walkCellsToEnemyGrid(gameMap.filter { it.site().isOtherPlayer() }.toMutableSet())
         logGrid(cellsToEnemyGrid, "cellsToEnemyGrid")
 
-        cellsToBorderGrid = initializeGrid { 9999 }
+        cellsToBorderGrid = Grid { 9999 }
         walkCellsToBorderGrid(gameMap.filter { it.isInnerBorder() }.toMutableSet())
         logGrid(cellsToBorderGrid, "cellsToBorderGrid")
 
         val replaceWithHotSpots = !madeContact &&
                 useHotSpots &&
-                gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it.y][it.x] }.min() ?: 0 < (1000 / localProduction)
+                gameMap.filter { it.isOuterBorder() }.map { hotSpotsGrid[it] }.min() ?: 0 < (1000 / localProduction)
 
         if (replaceWithHotSpots) {
-            distanceToEnemyGrid = hotSpotsGrid.map { it.toMutableList() }.toMutableList()
+            distanceToEnemyGrid = Grid { hotSpotsGrid[it] }
         } else {
-            distanceToEnemyGrid = initializeGrid { it.site().resource() }
+            distanceToEnemyGrid = Grid { it.site().resource() }
 
             directedGrid = gameMap
                     .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
@@ -243,8 +244,8 @@ object MyBot {
             directedGrid.forEach {
                 val (loc, value) = it
 
-                if (value.second <= distanceToEnemyGrid[loc.y][loc.x]) {
-                    distanceToEnemyGrid[loc.y][loc.x] = value.second
+                if (value.second <= distanceToEnemyGrid[loc]) {
+                    distanceToEnemyGrid[loc] = value.second
                 }
             }
 
@@ -262,7 +263,7 @@ object MyBot {
                             if (myCells.isNotEmpty() && otherPlayerCells.isNotEmpty() && combatCells.isEmpty() && environmentCells.size == 2) {
                                 if (otherPlayerCells.map { it.site().owner }.all { playerStats[it]?.strength ?: 0 < playerStats[id]?.strength ?: 0 }) {
                                     environmentCells.forEach {
-                                        distanceToEnemyGrid[it.y][it.x] = 0
+                                        distanceToEnemyGrid[it] = 0
                                     }
                                 }
                             }
@@ -280,9 +281,9 @@ object MyBot {
         logger.info("minimum strength: $minimumStrength")
 
         // build strength needed grid
-        strengthNeededGrid = initializeGrid {
+        strengthNeededGrid = Grid {
             if (it.site().isMine()) {
-                Math.min(128, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it.y][it.x] - 2) + 5), minimumStrength))
+                Math.min(128, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -297,7 +298,7 @@ object MyBot {
         val bestTargetStrength = gameMap
                 .filter { it.isOuterBorder() }
                 .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { it.site().strength }))
+                .sortedWith(compareBy({ distanceToEnemyGrid[it] }, { it.site().strength }))
                 .firstOrNull()
                 ?.site()
                 ?.strength ?: 255
@@ -306,17 +307,6 @@ object MyBot {
 
         return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
     }
-
-    fun initializeGrid(value: (Location) -> Int) =
-            (0 until gameMap.height)
-                    .map { y ->
-                        (0 until gameMap.width)
-                                .map { x ->
-                                    value(Location(x, y))
-                                }
-                                .toMutableList()
-                    }
-                    .toMutableList()
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
         val locToValue = mutableMapOf<Location, Pair<Double, Double>>()
@@ -358,16 +348,16 @@ object MyBot {
                 openSet,
                 {
                     if (it.site().isMine())
-                        it.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min() ?: 9999
-                    else distanceToEnemyGrid[it.y][it.x]
+                        it.neighbors().map { distanceToEnemyGrid[it] }.min() ?: 9999
+                    else distanceToEnemyGrid[it]
                 },
                 { current ->
                     if (current.site().isMine()) {
-                        distanceToEnemyGrid[current.y][current.x] =
+                        distanceToEnemyGrid[current] =
                                 Math.min(
-                                        distanceToEnemyGrid[current.y][current.x],
+                                        distanceToEnemyGrid[current],
                                         1 +
-                                                current.neighbors().map { distanceToEnemyGrid[it.y][it.x] }.min()!! +
+                                                current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                 else 0
@@ -381,11 +371,11 @@ object MyBot {
     fun walkCellsToEnemyGrid(openSet: MutableSet<Location>) {
         bfs(openSet, { current ->
             if (current.site().isOtherPlayer()) {
-                cellsToEnemyGrid[current.y][current.x] = 0
+                cellsToEnemyGrid[current] = 0
             } else {
-                cellsToEnemyGrid[current.y][current.x] = Math.min(
-                        cellsToEnemyGrid[current.y][current.x],
-                        1 + current.neighbors().map { cellsToEnemyGrid[it.y][it.x] }.min()!!)
+                cellsToEnemyGrid[current] = Math.min(
+                        cellsToEnemyGrid[current],
+                        1 + current.neighbors().map { cellsToEnemyGrid[it] }.min()!!)
             }
 
             current.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }
@@ -395,11 +385,11 @@ object MyBot {
     fun walkCellsToBorderGrid(openSet: MutableSet<Location>) {
         bfs(openSet, { current ->
             if (current.isInnerBorder()) {
-                cellsToBorderGrid[current.y][current.x] = 0
+                cellsToBorderGrid[current] = 0
             } else {
-                cellsToBorderGrid[current.y][current.x] = Math.min(
-                        cellsToBorderGrid[current.y][current.x],
-                        1 + current.neighbors().map { cellsToBorderGrid[it.y][it.x] }.min()!!)
+                cellsToBorderGrid[current] = Math.min(
+                        cellsToBorderGrid[current],
+                        1 + current.neighbors().map { cellsToBorderGrid[it] }.min()!!)
             }
 
             current.neighbors().filter { it.site().isMine() }
@@ -412,19 +402,19 @@ object MyBot {
 
         dijkstras(
                 openSet,
-                { distanceToEnemyGrid[it.y][it.x] },
+                { distanceToEnemyGrid[it] },
                 { current ->
                     if (current.isOuterBorder()) {
-                        strengthNeededGrid[current.y][current.x] = current.site().strength
+                        strengthNeededGrid[current] = current.site().strength
                         targetMap[current] = current
                         productionMap[current] = 0 to mutableSetOf()
                     } else if (current.site().isMine()) {
                         val next = current.neighbors()
                                 .filter {
-                                    distanceToEnemyGrid[it.y][it.x] < distanceToEnemyGrid[current.y][current.x] &&
+                                    distanceToEnemyGrid[it] < distanceToEnemyGrid[current] &&
                                             it in targetMap
                                 }
-                                .minBy { distanceToEnemyGrid[it.y][it.x] }
+                                .minBy { distanceToEnemyGrid[it] }
 
                         if (next != null) {
                             val target = targetMap[next]
@@ -432,14 +422,14 @@ object MyBot {
                             if (target != null) {
                                 val distance = gameMap.getDistance(current, target).toInt()
                                 if (distance > distVisited) {
-                                    strengthNeededGrid[target.y][target.x] = Math.max(0, strengthNeededGrid[target.y][target.x] - productionLocations.sumBy { it.site().production })
+                                    strengthNeededGrid[target] = Math.max(0, strengthNeededGrid[target] - productionLocations.sumBy { it.site().production })
                                     productionMap[target] = distance to productionLocations
                                 }
 
                                 targetMap[current] = target
-                                if (strengthNeededGrid[target.y][target.x] > 0) {
-                                    strengthNeededGrid[current.y][current.x] = strengthNeededGrid[target.y][target.x]
-                                    strengthNeededGrid[target.y][target.x] = Math.max(0, strengthNeededGrid[target.y][target.x] - current.site().strength)
+                                if (strengthNeededGrid[target] > 0) {
+                                    strengthNeededGrid[current] = strengthNeededGrid[target]
+                                    strengthNeededGrid[target] = Math.max(0, strengthNeededGrid[target] - current.site().strength)
 
                                     productionLocations.add(current)
                                 }
@@ -453,15 +443,15 @@ object MyBot {
                 })
     }
 
-    fun logGrid(grid: List<List<Int?>>, name: String) {
+    fun logGrid(grid: Grid, name: String) {
         val builder = StringBuilder("\n$name\n")
         builder.append("     ")
         builder.append((0 until gameMap.width).map { "$it".take(3).padEnd(4) }.joinToString(" "))
         builder.append("\n")
         for (y in 0 until gameMap.height) {
             builder.append("$y".take(3).padEnd(4) + " ")
-            builder.append(grid[y].mapIndexed { x, it ->
-                val value: Any? = if (Location(x, y).site().isMine() && it != null) it.toDouble() else it
+            builder.append(grid.grid[y].mapIndexed { x, it ->
+                val value: Any? = if (Location(x, y).site().isMine()) it.toDouble() else it
                 "$value".take(3).padEnd(4) }.joinToString(" ")
             )
             builder.append(" " + "$y".take(3).padEnd(4))
@@ -602,7 +592,7 @@ object MyBot {
         gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
-                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it.y][it.x] }))
+                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it] }))
                 .forEach { loc ->
                     // on the edge of battle
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -664,14 +654,14 @@ object MyBot {
 
         gameMap
                 .filter { it.site().isMine() && it !in sources }
-                .sortedWith(compareBy({ cellsToEnemyGrid[it.y][it.x] }, { distanceToEnemyGrid[it.y][it.x] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
+                .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
-                            .filter { distanceToEnemyGrid[it.y][it.x] < distanceToEnemyGrid[loc.y][loc.x] }
+                            .filter { distanceToEnemyGrid[it] < distanceToEnemyGrid[loc] }
                             .filter {
                                 val nextSite = nextMap.getSite(it)
 
@@ -684,12 +674,12 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > strengthNeededGrid[loc.y][loc.x] &&
+                                    loc.site().strength > strengthNeededGrid[loc] &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
                             .sortedWith(compareBy(
-                                    { distanceToEnemyGrid[it.y][it.x] },
+                                    { distanceToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
@@ -703,7 +693,7 @@ object MyBot {
                                     it
                                             .map {
                                                 it to listOf(
-                                                        distanceToEnemyGrid[it.y][it.x],
+                                                        distanceToEnemyGrid[it],
                                                         if (it in directedGrid) directedGrid[it]!!.first else 0,
                                                         if (madeContact) 0 else -it.site().production,
                                                         if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
@@ -745,7 +735,7 @@ object MyBot {
                             it !in battleBlackout &&
                             it !in blackoutCells
                 }
-                .sortedWith(compareBy({ distanceToEnemyGrid[it.y][it.x] }, { -it.site().overkill() }))
+                .sortedWith(compareBy({ distanceToEnemyGrid[it] }, { -it.site().overkill() }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
@@ -755,7 +745,7 @@ object MyBot {
                                         it !in sources &&
                                         it.site().strength > Math.max(it.site().production * 5, minimumStrength)
                             }
-                            .filter { distanceToEnemyGrid[it.y][it.x] > distanceToEnemyGrid[loc.y][loc.x] }
+                            .filter { distanceToEnemyGrid[it] > distanceToEnemyGrid[loc] }
 
                     allCombos(wouldAttack)
                             .sortedWith(compareBy({ it.size }, { it.map { it.site().strength }.sum() }))
@@ -789,7 +779,7 @@ object MyBot {
 
     fun Site.overkill() =
             if ((this.isEnvironment() && this.strength > 0)) {
-                -distanceToEnemyGrid[this.loc.y][this.loc.x]
+                -distanceToEnemyGrid[this.loc]
             } else {
                 this.loc.neighbors()
                         .map {
@@ -913,5 +903,28 @@ object MyBot {
             copy[j] = temp
         }
         return copy.toList()
+    }
+
+    class Grid(initializer: (Location) -> Int = { 0 }) {
+        val grid: MutableList<MutableList<Int>>
+
+        init {
+            grid =
+                    (0 until gameMap.height)
+                            .map { y ->
+                                (0 until gameMap.width)
+                                        .map { x ->
+                                            initializer(Location(x, y))
+                                        }
+                                        .toMutableList()
+                            }
+                            .toMutableList()
+        }
+
+        operator fun get(loc: Location) = grid[loc.y][loc.x]
+
+        operator fun set(loc: Location, value: Int) {
+            grid[loc.y][loc.x] = value
+        }
     }
 }
