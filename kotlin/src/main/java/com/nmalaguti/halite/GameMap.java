@@ -110,7 +110,7 @@ public class GameMap implements Iterable<Location> {
     public static class GameMapIterator implements Iterator<Location> {
 
         private GameMap gameMap;
-        private int i = 0;
+        private int i = -1;
 
         GameMapIterator(GameMap gameMap) {
             this.gameMap = gameMap;
