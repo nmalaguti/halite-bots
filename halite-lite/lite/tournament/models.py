@@ -9,6 +9,9 @@ class Bot(models.Model):
     sigma = models.FloatField(default=8.33333)
     enabled = models.BooleanField(default=True)
 
+    def score(self):
+        return self.mu - (self.sigma * 3)
+
     def __str__(self):
         return self.name
 

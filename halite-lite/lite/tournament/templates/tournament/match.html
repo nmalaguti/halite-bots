@@ -5,21 +5,25 @@
 
 {% block content %}
 <div id="container" class="container">
-    <table class="table">
-        <tr>
-            <th>Time</th>
-            <th>Opponents</th>
-            <th>Dimensions</th>
-            <th>Seed</th>
-        </tr>
-        <tr>
-            <td>{{ match.date|date:"d/m/Y" }} {{ match.date|time:"h:i:s A" }}</td>
-            <td>{% match_ordered match %}</td>
-            <td>{{ match.width }}x{{ match.height }}</td>
-            <td>{{ match.seed }}</td>
-        </tr>
-    </table>
-    <div id="pageContent" class="pageContent text-center"></div>
+    <div class="row">
+        <div class="col-md-12">
+            <table class="table">
+                <tr>
+                    <th>Time</th>
+                    <th>Opponents</th>
+                    <th>Dimensions</th>
+                    <th>Seed</th>
+                </tr>
+                <tr>
+                    <td>{{ match.date|date:"d/m/Y" }} {{ match.date|time:"h:i:s A" }}</td>
+                    <td>{% order_bots_by_results match %}</td>
+                    <td>{{ match.width }}x{{ match.height }}</td>
+                    <td>{{ match.seed }}</td>
+                </tr>
+            </table>
+            <div id="pageContent" class="pageContent text-center"></div>
+        </div>
+    </div>
 </div>
 {% endblock %}
 

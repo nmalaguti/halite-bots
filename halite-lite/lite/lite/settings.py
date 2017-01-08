@@ -128,3 +128,5 @@ BOT_DIR = os.path.join(BASE_DIR, '../../tournament/bots/available')
 BOT_EXEC = 'run.sh'
 
 HALITE_EXEC = os.path.join(BASE_DIR, '../../tournament/halite')
+
+PAGE_SIZE = 10
