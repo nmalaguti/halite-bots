@@ -75,7 +75,7 @@ class Command(BaseCommand):
         [seed, *rest] = sorted_bots
         closest = [pair[1] for pair in
                    sorted(
-                       [(random() * (1 + abs(seed.mu - bot.mu))**1.5, bot) for bot in rest],
+                       [(random() * abs(seed.mu - bot.mu), bot) for bot in rest],
                        key=itemgetter(0)
                    )]
 
