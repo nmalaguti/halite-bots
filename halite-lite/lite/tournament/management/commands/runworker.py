@@ -68,7 +68,7 @@ class Command(BaseCommand):
         num_players = choice(SEED_NUM_PLAYERS)
         sorted_bots = [pair[1] for pair in
                        sorted(
-                           [(random() * -bot.sigma**2, bot) for bot in Bot.objects.filter(enabled=True).all()],
+                           [(random() * bot.matches.count()**2, bot) for bot in Bot.objects.filter(enabled=True).all()],
                            key=itemgetter(0)
                        )]
 
