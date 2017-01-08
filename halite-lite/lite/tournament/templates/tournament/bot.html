@@ -6,7 +6,7 @@
 {% block content %}
     <div class="container">
         <p>{{ bot.name }} - mu: {{ bot.mu|floatformat:3 }}, sigma: {{ bot.sigma|floatformat:3 }}</p>
-        {% if bot.matches.all %}
+        {% if matches %}
             <table class="table">
                 <tr>
                     <th>Time</th>
@@ -17,10 +17,11 @@
                     <th>sigma</th>
                     <th>View</th>
                 </tr>
-                {% for match_result in bot.matches.all reversed %}
+                {% for match_result in matches %}
                     {% bot_match match_result %}
                 {% endfor %}
             </table>
+            {% paginate matches %}
         {% else %}
             <p>No match results are available.</p>
         {% endif %}
