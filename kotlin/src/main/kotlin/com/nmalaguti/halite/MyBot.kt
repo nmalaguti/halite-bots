@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCompressBugFixBot"
+val BOT_NAME = "MySuperHungryBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -349,7 +349,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / (4 * if (madeContact) 2 else 1)) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / 4) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
@@ -358,7 +358,7 @@ object MyBot {
             currLoc.neighbors()
                     .filter { it.site().isEnvironment() && it.site().strength > 0 }
                     .forEach {
-                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + 3)))
+                        val nextValue = currAvg.second - ((currAvg.second - it.site().resource().toDouble()) / ((dist + if (madeContact) 4 else 3)))
                         val currValue = locToValue.getOrPut(it, { dist to nextValue }).second
                         if (nextValue < currValue) locToValue[it] = dist to nextValue
                         queue.addLast(it)
@@ -383,7 +383,7 @@ object MyBot {
                                         distanceToEnemyGrid[current],
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
-                                                if (madeContact)
+                                                if (madeContact && cellsToEnemyGrid[current] > 3)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                 else 0
                                 )
