@@ -19,6 +19,6 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    url(r'^tournament/', include('tournament.urls')),
-    url(r'^admin/', admin.site.urls),
+    url(r'^lite/tournament/', include('tournament.urls')),
+    url(r'^lite/admin/', admin.site.urls),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

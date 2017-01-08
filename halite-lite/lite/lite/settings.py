@@ -48,6 +48,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tournament.middleware.content_type.ContentTypeMiddleware',
 ]
 
 ROOT_URLCONF = 'lite.urls'
@@ -118,9 +119,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.10/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = '/lite/static/'
 
-MEDIA_URL = '/media/'
+MEDIA_URL = '/lite/media/'
 
 BOT_DIR = os.path.join(BASE_DIR, '../../tournament/bots/available')
 
