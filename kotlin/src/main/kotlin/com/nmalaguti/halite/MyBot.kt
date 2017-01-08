@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCompressBugFixBot"
+val BOT_NAME = "MySuperSpearBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -270,6 +270,39 @@ object MyBot {
                         }
             }
 
+            if (madeContact) {
+                gameMap
+                        .filter {
+                            it.site().isMine() && it.neighbors().filter { it.site().isEnvironment() && it.site().strength > 0 }.size == 3
+                        }
+                        .forEach { loc ->
+                            val backwards = loc.neighbors().find { it.site().isMine() }
+                            if (backwards != null) {
+                                val target = loc.move(moveTowards(backwards, loc).dir)
+                                if (target.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 }) {
+                                    distanceToEnemyGrid[target] = Math.max(0, distanceToEnemyGrid[target] - 1)
+                                }
+                            }
+                        }
+
+                gameMap
+                        .filter {
+                            it.site().isEnvironment() && it.site().strength > 0 && it.neighbors().filter { it.site().isMine() }.size == 2
+                        }
+                        .filter {
+                            val neighbors = it.neighbors().filter { it.site().isMine() }
+                            val a = neighbors[0]
+                            val b = neighbors[1]
+
+                            moveTowards(it, a).dir.opposite() != moveTowards(it, b).dir
+                        }
+                        .filter { it.neighborsAndSelf().filter { it.site().isEnvironment() && it.site().strength > 0 }.all { it.site().strength <= 40 } }
+                        .forEach { loc ->
+                            distanceToEnemyGrid[loc] = distanceToEnemyGrid[loc] + 1
+                        }
+            }
+
+            // compression
             if (!madeContact) {
                 val outerBorder = gameMap
                         .filter { it.isOuterBorder() }
