@@ -19,6 +19,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
 
+admin.site.site_url = '/lite/'
+
 urlpatterns = [
     url(r'^$', RedirectView.as_view(url='/lite/tournament/', permanent=False)),
     url(r'^lite/$', RedirectView.as_view(url='/lite/tournament/', permanent=False)),
