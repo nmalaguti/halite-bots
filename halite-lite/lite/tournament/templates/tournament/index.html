@@ -1,0 +1,26 @@
+{% extends "tournament/base.html" %}
+
+{% block title %}Halite Private Tournament{% endblock %}
+
+{% block content %}
+    <div class="container">
+        {% if bot_list %}
+            <table class="table">
+                <tr>
+                    <th>Bot</th>
+                    <th>Mu</th>
+                    <th>Sigma</th>
+                </tr>
+                {% for bot in bot_list %}
+                    <tr>
+                        <td><a href="{%  url 'tournament:bot' bot.id %}">{{ bot.name }}</a></td>
+                        <td>{{ bot.mu|floatformat:3 }}</td>
+                        <td>{{ bot.sigma|floatformat:3 }}</td>
+                    </tr>
+                {% endfor %}
+            </table>
+        {% else %}
+            <p>No bots are available.</p>
+        {% endif %}
+    </div>
+{% endblock %}

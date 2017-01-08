@@ -1,0 +1,3 @@
+{% for r in results %}
+    <a href="{% url 'tournament:bot' r.bot.id %}">{{ r.bot.name }} ({{ r.last_frame_alive }})</a>{% if not forloop.last %},{% endif %}
+{% endfor %}

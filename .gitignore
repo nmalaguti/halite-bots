@@ -1,5 +1,6 @@
 /halite
 *.hlt
+*.hlt.gz
 *.log
 *.zip
 *.lck
