@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCompressBugFixBot"
+val BOT_NAME = "MyLogCompressBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -270,27 +270,30 @@ object MyBot {
                         }
             }
 
-            if (!madeContact) {
-                val outerBorder = gameMap
-                        .filter { it.isOuterBorder() }
-                        .filter { distanceToEnemyGrid[it] < MAXIMUM_STRENGTH }
+            val outerBorder = gameMap
+                    .filter { it.isOuterBorder() }
+                    .filterNot { it.site().isCombat() }
+                    .filter { distanceToEnemyGrid[it] < MAXIMUM_STRENGTH }
 
-                val outerBorderValues = outerBorder.map { distanceToEnemyGrid[it] }
+            val outerBorderValues = outerBorder.map { distanceToEnemyGrid[it] }
 
-                val min = outerBorderValues.min()
-                val max = outerBorderValues.max()
+            val min = outerBorderValues.min()
+            val max = outerBorderValues.max()
+            val avg = outerBorderValues.average()
 
-                if (min != null && max != null) {
-                    val range = max - min
-                    val result = range / Math.min(20.0, range.toDouble())
+            if (min != null && max != null) {
+                val range = max - min
 
-                    logger.info("max: $max, min: $min, range: $range, result: $result")
+                logger.info("max: $max, min: $min, range: $range, avg: $avg")
 
-                    if (range > 0) {
-                        outerBorder.forEach {
-                            if (distanceToEnemyGrid[it] == min) distanceToEnemyGrid[it] = 0
-                            else distanceToEnemyGrid[it] = ((distanceToEnemyGrid[it] - min) / result).toInt() + 1
-                        }
+                outerBorder.forEach {
+                    if (!madeContact) distanceToEnemyGrid[it] -= min
+                    if (range < 12) {
+                        if (distanceToEnemyGrid[it] > 5) distanceToEnemyGrid[it] = (Math.log10(distanceToEnemyGrid[it].toDouble()) / Math.log10(1.346)).toInt()
+                    } else if (range < 17) {
+                        if (distanceToEnemyGrid[it] > 7) distanceToEnemyGrid[it] = (Math.log10(distanceToEnemyGrid[it].toDouble()) / Math.log10(1.296)).toInt()
+                    } else {
+                        if (distanceToEnemyGrid[it] > 9) distanceToEnemyGrid[it] = (Math.log10(distanceToEnemyGrid[it].toDouble()) / Math.log10(1.258)).toInt()
                     }
                 }
             }
