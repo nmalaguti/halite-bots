@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCompressBugFixBot"
+val BOT_NAME = "MyMultiTaskingBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -197,25 +197,21 @@ object MyBot {
     // MOVE LOGIC
 
     fun connectedPlayers(): Set<Int> {
-        val connectedCells = visitNotEnvironment(gameMap.filter { it.isInnerBorder() }.toMutableSet())
-        return connectedCells.groupBy { it.site().owner }.filterNot { it.key == 0 }.keys
-    }
+        val openSet = gameMap
+                .filter { it.site().isMine() && it.neighbors().any { it.site().isCombat() } }
+                .toMutableSet()
 
-    fun visitNotEnvironment(openSet: MutableSet<Location>): MutableSet<Location> {
-        val closedSet = mutableSetOf<Location>()
-        while (openSet.isNotEmpty()) {
-            val current = openSet.first()
-            openSet.remove(current)
-            if (current !in closedSet) {
-                closedSet.add(current)
+        val players = mutableSetOf<Int>()
+        bfs(openSet, { current ->
+            if (!current.site().isEnvironment()) players.add(current.site().owner)
 
+            if (current.site().isCombat() || current.site().isMine()) {
                 current.neighbors()
                         .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-                        .forEach { openSet.add(it) }
-            }
-        }
+            } else emptyList<Location>()
+        })
 
-        return closedSet
+        return players
     }
 
     fun buildDistanceToEnemyGrid() {
@@ -236,18 +232,20 @@ object MyBot {
         } else {
             distanceToEnemyGrid = Grid { it.site().resource() }
 
-            directedGrid = gameMap
-                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                    .map { it to directedWalk(it) }
-                    .toMap()
+            if (numConnectedPlayers < 3) {
+                directedGrid = gameMap
+                        .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                        .map { it to directedWalk(it) }
+                        .toMap()
 
-            directedGrid.forEach {
-                val (loc, value) = it
+                directedGrid.forEach {
+                    val (loc, value) = it
 
-                if (value.second <= distanceToEnemyGrid[loc]) {
-                    distanceToEnemyGrid[loc] = value.second
+                    if (value.second <= distanceToEnemyGrid[loc]) {
+                        distanceToEnemyGrid[loc] = value.second
+                    }
                 }
-            }
+            } else directedGrid = mapOf()
 
             if (stillMax > 1) {
                 gameMap
