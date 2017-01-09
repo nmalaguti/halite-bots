@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySuperHungryBot"
+val BOT_NAME = "MySuperHungryNoFixBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -499,9 +499,8 @@ object MyBot {
         fun Location.swappable(source: Location) =
                 this != source &&
                         this.site().isMine() &&
-                        source.site().isMine() &&
-                        this !in sources && source !in sources &&
-                        this !in destinations && source !in destinations &&
+                        this !in sources &&
+                        this !in destinations &&
                         ((source.site().strength == 255 && this.site().strength < 255) ||
                                 this.site().strength + 15 < source.site().strength)
 
@@ -541,24 +540,6 @@ object MyBot {
             }
         }
 
-        fun undoMove(source: Location, target: Location) {
-            if (source !in sources || sources[source] == Direction.STILL) {
-                logger.warning("Asked to undo a move from $source but did not move that location.")
-                return
-            }
-
-            val originSite = gameMap.getSite(source)
-            val startSite = nextMap.getSite(source)
-            val destinationSite = nextMap.getSite(target)
-
-            if (startSite.owner == destinationSite.owner) {
-                startSite.strength += originSite.strength
-                destinationSite.strength -= originSite.strength
-            } else {
-                logger.warning("Asked to undo an attack move from $source but that's too hard.")
-            }
-        }
-
         fun finalizeMove(source: Location, target: Location, addToBattleBlackout: Boolean, preventSwaps: Boolean) {
             if (target.swappable(source) &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
@@ -589,8 +570,6 @@ object MyBot {
                         return
                     }
                 }
-
-                if (source in sources) undoMove(source, source.move(sources[source]!!))
 
                 if (nextMap.getSite(target).isMine() && gameMap.getSite(source).strength + nextMap.getSite(target).strength >= MAXIMUM_STRENGTH) {
                     logger.warning("Move from $source to $target causes cap loss")
