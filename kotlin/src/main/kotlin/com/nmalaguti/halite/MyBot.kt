@@ -232,7 +232,7 @@ object MyBot {
         } else {
             distanceToEnemyGrid = Grid { it.site().resource() }
 
-            if (numConnectedPlayers < 3) {
+            if (numConnectedPlayers < 4) {
                 directedGrid = gameMap
                         .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
                         .map { it to directedWalk(it) }
