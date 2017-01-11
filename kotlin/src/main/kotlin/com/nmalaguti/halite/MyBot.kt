@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyNewBattleBot"
+val BOT_NAME = "MyNewImprovedBattleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -698,40 +698,77 @@ object MyBot {
 
                     if (loc in sources) return@forEach
 
-                    val target = loc.neighbors()
-                            .filter { it !in battleBlackout }
-                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-                            .filter {
-                                enemyDamageTargets[it]?.groupBy { it.second }?.all {
-                                    it.value.any {
-                                        it.second.site().strength < 64 || it.second.site().strength == enemyDamageStrength[it] || enemyDamageStrength[it]!! > loc.site().strength
-                                    }
-                                } ?: true
-                            }
-                            .filter { if (it.nextSite().isMine()) it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc) else true}
-                            .sortedWith(compareBy(
-                                    {
-                                        enemyDamageTargets[it]
-                                                ?.groupBy { it.second }
-                                                ?.map {
-                                                    it.value.map {
-                                                        -enemyDamageStrength[it]!!
-                                                    }.max()!!
-                                                }?.sum() ?: 0
-                                    },
-                                    { cellsToEnemyGrid[it] }
-//                                    { -(enemyDamageTargets[it]?.size ?: 0) }
-//                                    { -it.site().overkill() }
-//                                    { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-//                                    { if (!it.nextSite().isMine()) -it.site().production else 0 }
-                            ))
-                            .firstOrNull()
+                    if (loc.allNeighborsWithin(4).none { it.site().isOtherPlayer() }) {
+                        loc.neighbors()
+                                .filter { it.site().isCombat() }
+                                .filter {
+                                    loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
+                                            it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH
+                                }
+                                .sortedWith(compareBy(
+                                        { -it.site().production },
+                                        { cellsToEnemyGrid[it] }
+//                                        { it.site().strength }
+//                                        { -(enemyDamageTargets[it]?.size ?: 0) }
+//                                        { -it.site().overkill() }
+//                                        { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
+//                                        { if (!it.nextSite().isMine()) -it.site().production else 0 }
+                                ))
+                                .firstOrNull()
+                                ?.let { target ->
+                                    finalizeMove(loc, target, false, false)
+                                }
 
-                    if (target != null) {
-                        finalizeMove(loc, target, true, false)
-                        enemyDamageTargets[target]?.forEach {
-                            enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
-                            enemyDamageStrength[it] = Math.max(0, enemyDamageStrength[it]!!)
+                    } else {
+                        val target = loc.neighbors()
+                                .filter { it !in battleBlackout }
+//                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                .filter {
+                                    enemyDamageTargets[it]?.groupBy { it.second }?.all {
+                                        it.value.any {
+                                            (it.second.site().strength == 255 && enemyDamageStrength[it]!! > 0) ||
+//                                                    it.second.site().strength < 64 ||
+                                                    it.second.site().strength == enemyDamageStrength[it] ||
+                                                    enemyDamageStrength[it]!! > loc.site().strength
+                                        }
+                                    } ?: true
+                                }
+                                .filter {
+                                    if (it.site().isEnvironment() && it.site().strength > 0)
+                                        enemyDamageTargets[it]?.all { origin ->
+                                            val enemyStrength = playerStats[origin.second.site().owner]?.strength ?: 0
+                                            val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
+                                            myStrength > enemyStrength
+                                        } ?: true && loc.site().strength > it.site().strength
+                                    else true
+                                }
+                                .filter { if (it != loc && it.nextSite().isMine()) it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc) else true}
+                                .sortedWith(compareBy(
+                                        {
+                                            enemyDamageTargets[it]
+                                                    ?.groupBy { it.second }
+                                                    ?.map {
+                                                        it.value.map {
+                                                            -enemyDamageStrength[it]!!
+                                                        }.max()!!
+                                                    }?.sum() ?: 0
+                                        },
+                                        { cellsToEnemyGrid[it] },
+                                        { -it.site().production }
+//                                        { it.site().strength }
+//                                        { -(enemyDamageTargets[it]?.size ?: 0) }
+//                                        { -it.site().overkill() }
+//                                        { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
+//                                        { if (!it.nextSite().isMine()) -it.site().production else 0 }
+                                ))
+                                .firstOrNull()
+
+                        if (target != null) {
+                            finalizeMove(loc, target, true, false)
+                            enemyDamageTargets[target]?.forEach {
+                                enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
+                                enemyDamageStrength[it] = Math.max(0, enemyDamageStrength[it]!!)
+                            }
                         }
                     }
                 }
@@ -849,7 +886,7 @@ object MyBot {
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
-                            .filter { it !in enemyDamageTargets }
+//                            .filter { it !in enemyDamageTargets }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] < distanceToEnemyGrid[loc] }
                             .filter {
@@ -868,6 +905,7 @@ object MyBot {
                             }
                             .sortedWith(compareBy(
                                     { distanceToEnemyGrid[it] },
+                                    { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
@@ -955,7 +993,6 @@ object MyBot {
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
-                            .filter { it !in enemyDamageTargets }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
                             .filter {
@@ -973,6 +1010,7 @@ object MyBot {
                             }
                             .sortedWith(compareBy(
                                     { distanceToEnemyGrid[it] },
+                                    { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
