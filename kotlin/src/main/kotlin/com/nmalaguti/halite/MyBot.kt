@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFineBattleBot"
+val BOT_NAME = "MyFineBattleBotv2"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -331,7 +331,9 @@ object MyBot {
                 .distinct()
                 .forEach { loc ->
                     loc.neighborsAndSelf()
-                            .forEach { loc2 ->
+                            .forEach loc2@ { loc2 ->
+                                if (loc2.site().isEnvironment() && loc2.site().strength > 0) return@loc2
+
                                 enemyDamageStrength[loc2 to loc] = loc.site().strength
                                 loc2.neighborsAndSelf()
                                         .forEach {
@@ -393,11 +395,6 @@ object MyBot {
     }
 
     fun walkDistanceToEnemyGrid(openSet: MutableSet<Location>) {
-        val avg = openSet.map { distanceToEnemyGrid[it] }.average()
-        val stdDev = Math.sqrt(openSet.map { Math.pow(distanceToEnemyGrid[it] - avg, 2.0) }.average())
-
-        logger.info("border stdDev: $stdDev")
-
         dijkstras(
                 openSet,
                 {
@@ -639,55 +636,6 @@ object MyBot {
 
         /////////////////////////////////////////////////////
 
-        // new: negate overkill
-
-
-
-//        gameMap
-//                .filter {
-//                    it.site().isMine() &&
-//                            it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 } &&
-//                            it.site().strength == 255
-//                }
-//                .forEach { loc ->
-//                    if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
-//
-//                    if (loc in sources) return@forEach
-//
-//                    loc.cornerNeighbors()
-//                            .filter { it !in sources && it.site().isMine() && it.site().strength == 255 && it.neighbors().any { it.site().isEnvironment() && it.site().strength == 0 } }
-//                            .forEach { mine ->
-//                                // move away if possible
-//                                mine.neighbors()
-//                                        .filter { nextMap.getSite(it).isMine() && mine.site().strength + nextMap.getSite(it).strength < MAXIMUM_STRENGTH }
-//                                        .sortedBy { nextMap.getSite(it).strength }
-//                                        .firstOrNull()
-//                                        ?.let { target ->
-//                                            finalizeMove(mine, target, true, false)
-//                                        }
-//                            }
-//                }
-
-
-//        gameMap
-//                .filter { it in enemyDamageTargets }
-//                .sortedByDescending { enemyDamageTargets[it]?.sumBy { enemyDamageStrength[it] } ?: 0 }
-//                .forEach { target ->
-//                    target.neighborsAndSelf()
-//                            .filter { it.site().isMine() && it.site().strength > 0 }
-//                            .sortedByDescending { it.site().strength }
-//                            .takeWhile { loc ->
-//                                if (enemyDamageTargets[target]?.all { it.site().strength == enemyDamageStrength[it] || enemyDamageStrength[it] > loc.site().strength } ?: false) {
-//                                    finalizeMove(loc, target, true, false)
-//                                    enemyDamageTargets[target]?.forEach {
-//                                        enemyDamageStrength[it] -= loc.site().strength
-//                                    }
-//                                    true
-//                                } else false
-//                            }
-//                }
-
-
         gameMap
                 .filter { it.site().isMine() && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isCombat() } }
@@ -698,7 +646,7 @@ object MyBot {
 
                     if (loc in sources) return@forEach
 
-                    if (loc.allNeighborsWithin(4).none { it.site().isOtherPlayer() }) {
+                    if (loc.allNeighborsWithin(3).none { it.site().isOtherPlayer() }) {
                         loc.neighbors()
                                 .filter { it.site().isCombat() }
                                 .filter {
@@ -722,7 +670,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-//                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.second }?.all {
                                         it.value.any {
@@ -734,15 +682,10 @@ object MyBot {
                                     } ?: true
                                 }
                                 .filter {
-                                    if (it.site().isEnvironment() && it.site().strength > 0)
-                                        numPlayers == 2 && enemyDamageTargets[it]?.all { origin ->
-                                            val enemyStrength = playerStats[origin.second.site().owner]?.strength ?: 0
-                                            val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
-                                            myStrength > enemyStrength
-                                        } ?: true && loc.site().strength > it.site().strength
+                                    if (it != loc && it.nextSite().isMine())
+                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
-                                .filter { if (it != loc && it.nextSite().isMine()) it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc) else true}
                                 .sortedWith(compareBy(
                                         {
                                             enemyDamageTargets[it]
@@ -754,7 +697,8 @@ object MyBot {
                                                     }?.sum() ?: 0
                                         },
                                         { cellsToEnemyGrid[it] },
-                                        { -it.site().production }
+                                        { -it.site().production },
+                                        { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size }
 //                                        { it.site().strength }
 //                                        { -(enemyDamageTargets[it]?.size ?: 0) }
 //                                        { -it.site().overkill() }
@@ -769,114 +713,14 @@ object MyBot {
                                 enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
                                 enemyDamageStrength[it] = Math.max(0, enemyDamageStrength[it]!!)
                             }
+                        } else {
+                            enemyDamageTargets[loc]?.forEach {
+                                enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
+                                enemyDamageStrength[it] = Math.max(0, enemyDamageStrength[it]!!)
+                            }
                         }
                     }
                 }
-
-//        gameMap
-//                .filter { it.site().isMine() && it.site().strength > 0 }
-//                .filter { it.neighbors().any { it.site().isCombat() } }
-//                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it] }))
-//                .forEach { loc ->
-//                    if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
-//
-//                    if (loc in sources) return@forEach
-//
-//                    val target = loc.neighborsAndSelf()
-//                            .filter { enemyDamageTargets[it]?.all { it.second.first || it.second.second > loc.site().strength } ?: true }
-////                            .filter { it !in battleBlackout }
-//                            .filter { if (it != loc && it.nextSite().isMine()) it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH else true}
-//                            .sortedWith(compareBy(
-////                                    { if (it.site().isCombat()) 0 else 1 },
-//                                    { enemyDamageTargets[it]?.map { -it.second.second }?.sum() ?: 0 },
-//                                    { -it.site().overkill() },
-//                                    { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-//                                    { -it.site().production }
-//                            ))
-//                            .firstOrNull()
-//
-//                    if (target != null) {
-//                        finalizeMove(loc, target, true, false)
-//                        enemyDamageTargets[target] = enemyDamageTargets[target]?.map {
-//                            it.first to (false to it.second.second - loc.site().strength)
-//                        }?.toMutableSet() ?: mutableSetOf()
-//                    }
-//                }
-
-
-        ///
-
-
-//        gameMap
-//                .filter { it.site().isMine() && it !in sources && it.site().strength > 0 }
-//                .filter { it.neighbors().any { it.site().isCombat() } }
-//                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it] }))
-//                .forEach { loc ->
-//                    // on the edge of battle
-//                    if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
-//
-//                    if (loc in sources) return@forEach
-//
-//                    val target =
-//                            if (loc.site().strength < loc.site().production * 2 || loc.site().strength < MINIMUM_STRENGTH) loc
-//                            else loc.neighbors()
-////                                    .filter { it.site().isEnvironment() && it.site().strength == 0 }
-//                                    .filter { it !in battleBlackout }
-//                                    .filter { enemyDamageTargets[it]?.all { it.site().strength == enemyDamageStrength[it] || enemyDamageStrength[it] > loc.site().strength } ?: true }
-//                                    .filter {
-//                                        if (nextMap.getSite(it).isMine())
-//                                        nextMap.getSite(it).strength + loc.site().strength < MAXIMUM_STRENGTH ||
-//                                                it.swappable(loc)
-//                                        else true
-//                                    }
-//                                    .sortedWith(compareBy(
-//                                            { enemyDamageTargets[it]?.map { -enemyDamageStrength[it] }?.sum() ?: 0 },
-//                                            { cellsToEnemyGrid[it] },
-//                                            { -it.site().overkill() },
-//                                            { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-//                                            { -it.site().production }
-//                                    ))
-//                                    .let {
-//                                        if (DEBUG_TIE_BREAKERS) {
-//                                            it
-//                                                    .map {
-//                                                        it to listOf(
-//                                                                -it.site().overkill(),
-//                                                                -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size,
-//                                                                -it.site().production
-//                                                        )
-//                                                    }
-//                                                    .groupBy { it.second }
-//                                                    .let {
-//                                                        if (it.any { it.value.size > 1 }) {
-//                                                            val builder = StringBuilder()
-//
-//                                                            builder.appendln("combat tie breaker")
-//                                                            it.values.flatten().forEach {
-//                                                                builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-//                                                            }
-//                                                            logger.info(builder.toString())
-//                                                        }
-//                                                    }
-//                                        }
-//
-//                                        it
-//                                    }
-//                                    .firstOrNull() ?: loc
-//
-//                    finalizeMove(loc, target, true, false)
-//                    enemyDamageTargets[target]?.forEach {
-//                        enemyDamageStrength[it] -= loc.site().strength
-//                    }
-//
-//                    if (loc.site().strength == 255) {
-//                        target.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }.forEach {
-//                            if (it.neighbors().none { nextMap.getSite(it).isCombat() || it.site().isOtherPlayer() } && it.cornerNeighbors().any { it.site().isOtherPlayer() && it.site().strength == 255 }) {
-//                                battleBlackout.add(it)
-//                            }
-//                        }
-//                    }
-//                }
 
         gameMap
                 .filter { it.site().isMine() && it !in sources }
@@ -886,7 +730,6 @@ object MyBot {
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
-//                            .filter { it !in enemyDamageTargets }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] < distanceToEnemyGrid[loc] }
                             .filter {
@@ -1001,6 +844,7 @@ object MyBot {
                                 if (nextSite.isEnvironment() && nextSite.strength == 0) {
                                     false
                                 } else if (nextSite.isEnvironment()) {
+                                    // environment
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
