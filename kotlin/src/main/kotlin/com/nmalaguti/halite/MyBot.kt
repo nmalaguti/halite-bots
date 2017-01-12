@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyNewImproved2PlayerBreakthroughBattleBot"
+val BOT_NAME = "MyFineBattleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -726,7 +726,7 @@ object MyBot {
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.second }?.all {
                                         it.value.any {
-                                            (it.second.site().strength == 255 && enemyDamageStrength[it]!! > 0) ||
+//                                            (it.second.site().strength == 255 && enemyDamageStrength[it]!! > 0) ||
 //                                                    it.second.site().strength < 64 ||
                                                     it.second.site().strength == enemyDamageStrength[it] ||
                                                     enemyDamageStrength[it]!! > loc.site().strength
