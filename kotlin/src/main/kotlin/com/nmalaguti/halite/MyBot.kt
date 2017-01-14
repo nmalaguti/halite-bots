@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFineBattleBotv2"
+val BOT_NAME = "MyFineBattleBotv3"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -310,7 +310,7 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid {
             if (it.site().isMine()) {
-                Math.min(128, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.max(it.site().production * 5, minimumStrength)
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -670,7 +670,6 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.second }?.all {
                                         it.value.any {
@@ -680,6 +679,15 @@ object MyBot {
                                                     enemyDamageStrength[it]!! > loc.site().strength
                                         }
                                     } ?: true
+                                }
+                                .filter {
+                                    if (it.site().isEnvironment() && it.site().strength > 0)
+                                        numPlayers == 2 && enemyDamageTargets[it]?.all { origin ->
+                                            val enemyStrength = playerStats[origin.second.site().owner]?.strength ?: 0
+                                            val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
+                                            myStrength > enemyStrength
+                                        } ?: true && loc.site().strength > it.site().strength
+                                    else true
                                 }
                                 .filter {
                                     if (it != loc && it.nextSite().isMine())
