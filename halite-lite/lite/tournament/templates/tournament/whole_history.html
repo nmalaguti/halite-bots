@@ -1,0 +1,28 @@
+{% extends "tournament/base.html" %}
+
+{% block title %}Halite Private Tournament - Whole History{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="row">
+            {% if gammas %}
+                <table class="table">
+                    <tr>
+                        <th>Bot</th>
+                        <th>Gamma</th>
+                        <th>Games</th>
+                    </tr>
+                    {% for bot, gamma, count in gammas %}
+                        <tr>
+                            <td>{{ bot }}</td>
+                            <td>{{ gamma|floatformat:5 }}</td>
+                            <td>{{ count }}</td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            {% else %}
+                <h2>No bots are available.</h2>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
