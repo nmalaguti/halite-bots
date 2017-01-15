@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFineBattleBotv2"
+val BOT_NAME = "MyNoBruiseBattleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -310,7 +310,7 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid {
             if (it.site().isMine()) {
-                Math.min(128, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.max(it.site().production * 5, minimumStrength)
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -656,11 +656,6 @@ object MyBot {
                                 .sortedWith(compareBy(
                                         { -it.site().production },
                                         { cellsToEnemyGrid[it] }
-//                                        { it.site().strength }
-//                                        { -(enemyDamageTargets[it]?.size ?: 0) }
-//                                        { -it.site().overkill() }
-//                                        { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-//                                        { if (!it.nextSite().isMine()) -it.site().production else 0 }
                                 ))
                                 .firstOrNull()
                                 ?.let { target ->
@@ -674,9 +669,7 @@ object MyBot {
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.second }?.all {
                                         it.value.any {
-//                                            (it.second.site().strength == 255 && enemyDamageStrength[it]!! > 0) ||
-//                                                    it.second.site().strength < 64 ||
-                                                    it.second.site().strength == enemyDamageStrength[it] ||
+                                            it.second.site().strength == enemyDamageStrength[it] ||
                                                     enemyDamageStrength[it]!! > loc.site().strength
                                         }
                                     } ?: true
@@ -699,11 +692,6 @@ object MyBot {
                                         { cellsToEnemyGrid[it] },
                                         { -it.site().production },
                                         { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size }
-//                                        { it.site().strength }
-//                                        { -(enemyDamageTargets[it]?.size ?: 0) }
-//                                        { -it.site().overkill() }
-//                                        { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size },
-//                                        { if (!it.nextSite().isMine()) -it.site().production else 0 }
                                 ))
                                 .firstOrNull()
 
