@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyMoreOverkillBattleBot"
+val BOT_NAME = "MyIdleStrengthBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -38,6 +38,7 @@ object MyBot {
     var minimumStrength = 0
     lateinit var enemyDamageTargets: MutableMap<Location, MutableSet<Movement>>
     lateinit var enemyDamageStrength: MutableMap<Movement, Int>
+    var idleStrength: Int = 0
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -78,6 +79,7 @@ object MyBot {
             makeMoves()
 
             logger.info("stillMax: $stillMax")
+            logger.info("idleStrength: $idleStrength")
 
             endGameLoop()
         }
@@ -317,6 +319,7 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
+                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -613,10 +616,7 @@ object MyBot {
                 .filter { it.site().isMine() && it.site().strength > 0 }
                 .filter { it.neighbors().any { it.site().isCombat() } }
                 .filterNot { it.site().strength < it.site().production * 2 || it.site().strength < MINIMUM_STRENGTH }
-                .sortedWith(compareBy(
-                        { -it.site().strength },
-                        { cellsToEnemyGrid[it] }
-                ))
+                .sortedWith(compareBy({ -it.site().strength }, { cellsToEnemyGrid[it] }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
@@ -641,33 +641,18 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filter { destination ->
-                                    /*
-                                              a   a
-                                            a ■ □ ■ a
-                                            □ a ■ m □
-                                                a
-                                     */
-
-                                    enemyDamageTargets[destination]
-                                            ?.all { movement ->
-                                                // undamaged
-                                                enemyDamageStrength[movement] == movement.origin.site().strength ||
-                                                        // I won't suffer overkill from it
-                                                        enemyDamageStrength[movement]!! > loc.site().strength
-                                            } ?: true
+                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                .filter {
+                                    enemyDamageTargets[it]?.groupBy { it.origin }?.all {
+                                        it.value.any {
+                                            it.origin.site().strength == enemyDamageStrength[it] ||
+                                                    enemyDamageStrength[it]!! > loc.site().strength
+                                        }
+                                    } ?: true
                                 }
-                                .filter { destination ->
-                                    if (destination.nextSite().isMine())
-                                        destination.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH ||
-                                                (destination.swappable(loc) &&
-                                                        enemyDamageTargets[loc]
-                                                                ?.all { movement ->
-                                                                    // undamaged
-                                                                    enemyDamageStrength[movement] == movement.origin.site().strength ||
-                                                                            // I won't suffer overkill from it
-                                                                            enemyDamageStrength[movement]!! > destination.site().strength
-                                                                } ?: true)
+                                .filter {
+                                    if (it != loc && it.nextSite().isMine())
+                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
                                 .sortedWith(compareBy(
@@ -675,9 +660,9 @@ object MyBot {
                                             enemyDamageTargets[it]
                                                     ?.groupBy { it.origin }
                                                     ?.map {
-                                                        -it.value.map {
-                                                            enemyDamageStrength[it]!!
-                                                        }.min()!!
+                                                        it.value.map {
+                                                            -enemyDamageStrength[it]!!
+                                                        }.max()!!
                                                     }?.sum() ?: 0
                                         },
 //                                        {
@@ -714,15 +699,6 @@ object MyBot {
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
-                            .filter {
-                                enemyDamageTargets[it]
-                                        ?.all { movement ->
-                                            // undamaged
-                                            enemyDamageStrength[movement] == movement.origin.site().strength ||
-                                                    // I won't suffer overkill from it
-                                                    enemyDamageStrength[movement]!! > loc.site().strength
-                                        } ?: true
-                            }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] < distanceToEnemyGrid[loc] }
                             .filter {
@@ -829,15 +805,6 @@ object MyBot {
 
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
-                            .filter {
-                                enemyDamageTargets[it]
-                                        ?.all { movement ->
-                                            // undamaged
-                                            enemyDamageStrength[movement] == movement.origin.site().strength ||
-                                                    // I won't suffer overkill from it
-                                                    enemyDamageStrength[movement]!! > loc.site().strength
-                                        } ?: true
-                            }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
                             .filter {
@@ -904,10 +871,12 @@ object MyBot {
                     }
                 }
 
-        stillMaxCells = gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
-                .toSet()
-        stillMax = stillMaxCells.size
+        idleStrength = gameMap
+                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
+                .map { it.site().strength }
+                .sum()
+
+        stillMax = idleStrength / 255
     }
 
     // EXTENSIONS METHODS
