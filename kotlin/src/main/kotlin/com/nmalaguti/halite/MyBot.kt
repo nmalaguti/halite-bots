@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFineBattleBotv3"
+val BOT_NAME = "MyFineBattleBotv4"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -332,8 +332,6 @@ object MyBot {
                 .forEach { loc ->
                     loc.neighborsAndSelf()
                             .forEach loc2@ { loc2 ->
-                                if (loc2.site().isEnvironment() && loc2.site().strength > 0) return@loc2
-
                                 enemyDamageStrength[loc2 to loc] = loc.site().strength
                                 loc2.neighborsAndSelf()
                                         .forEach {
