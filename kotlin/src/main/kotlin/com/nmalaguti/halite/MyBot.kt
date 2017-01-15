@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCanIDoBetterBotv3"
+val BOT_NAME = "MyCanIDoBetterBotv4"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -392,7 +392,7 @@ object MyBot {
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact && cellsToEnemyGrid[current] > 3)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                else cellsToBorderGrid[current]
+                                                else cellsToBorderGrid[current] / 2
                                 )
                     }
 
