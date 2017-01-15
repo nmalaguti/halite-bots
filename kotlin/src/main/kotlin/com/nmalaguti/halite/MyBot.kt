@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyFineBattleBotv2-nobruiseexpand"
+val BOT_NAME = "MyCanIDoBetterBotv3"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -392,7 +392,7 @@ object MyBot {
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact && cellsToEnemyGrid[current] > 3)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                else 0
+                                                else cellsToBorderGrid[current]
                                 )
                     }
 
@@ -713,6 +713,7 @@ object MyBot {
                                     { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
+                                    { if (!madeContact) it.site().strength else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
@@ -819,6 +820,7 @@ object MyBot {
                                     { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
+                                    { if (!madeContact) it.site().strength else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
