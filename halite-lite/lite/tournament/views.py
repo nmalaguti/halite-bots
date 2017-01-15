@@ -50,7 +50,7 @@ class MatchView(generic.DetailView):
 
 
 def whole_history(request):
-    matches = Match.objects.all()
+    matches = Match.objects.all().prefetch_related('results__bot')
 
     rankings = []
     num_matches = Counter()
