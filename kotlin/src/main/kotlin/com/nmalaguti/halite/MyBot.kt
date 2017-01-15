@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBot"
+val BOT_NAME = "MyFineBattleBotv2-nobruiseexpand"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -38,7 +38,6 @@ object MyBot {
     var minimumStrength = 0
     lateinit var enemyDamageTargets: MutableMap<Location, MutableSet<Movement>>
     lateinit var enemyDamageStrength: MutableMap<Movement, Int>
-    var idleStrength: Int = 0
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -79,7 +78,6 @@ object MyBot {
             makeMoves()
 
             logger.info("stillMax: $stillMax")
-            logger.info("idleStrength: $idleStrength")
 
             endGameLoop()
         }
@@ -207,25 +205,21 @@ object MyBot {
     // MOVE LOGIC
 
     fun connectedPlayers(): Set<Int> {
-        val connectedCells = visitNotEnvironment(gameMap.filter { it.isInnerBorder() }.toMutableSet())
-        return connectedCells.groupBy { it.site().owner }.filterNot { it.key == 0 }.keys
-    }
+        val openSet = gameMap
+                .filter { it.site().isMine() && it.neighbors().any { it.site().isCombat() } }
+                .toMutableSet()
 
-    fun visitNotEnvironment(openSet: MutableSet<Location>): MutableSet<Location> {
-        val closedSet = mutableSetOf<Location>()
-        while (openSet.isNotEmpty()) {
-            val current = openSet.first()
-            openSet.remove(current)
-            if (current !in closedSet) {
-                closedSet.add(current)
+        val players = mutableSetOf<Int>()
+        bfs(openSet, { current ->
+            if (!current.site().isEnvironment()) players.add(current.site().owner)
 
+            if (current.site().isCombat() || current.site().isMine()) {
                 current.neighbors()
                         .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-                        .forEach { openSet.add(it) }
-            }
-        }
+            } else emptyList<Location>()
+        })
 
-        return closedSet
+        return players
     }
 
     fun buildDistanceToEnemyGrid() {
@@ -871,12 +865,10 @@ object MyBot {
                     }
                 }
 
-        idleStrength = gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
-                .map { it.site().strength }
-                .sum()
-
-        stillMax = idleStrength / 255
+        stillMaxCells = gameMap
+                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
+                .toSet()
+        stillMax = stillMaxCells.size
     }
 
     // EXTENSIONS METHODS
