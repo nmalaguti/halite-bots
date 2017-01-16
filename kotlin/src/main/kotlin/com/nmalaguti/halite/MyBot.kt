@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCanIDoBetterBotv5"
+val BOT_NAME = "MyCanIDoBetterBotv6"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -38,6 +38,7 @@ object MyBot {
     var minimumStrength = 0
     lateinit var enemyDamageTargets: MutableMap<Location, MutableSet<Movement>>
     lateinit var enemyDamageStrength: MutableMap<Movement, Int>
+    var idleStrength: Int = 0
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -78,6 +79,7 @@ object MyBot {
             makeMoves()
 
             logger.info("stillMax: $stillMax")
+            logger.info("idleStrength: $idleStrength")
 
             endGameLoop()
         }
@@ -291,8 +293,7 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
-                else Math.min(128, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.max(it.site().production * 5, minimumStrength)
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -392,6 +393,7 @@ object MyBot {
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact && cellsToEnemyGrid[current] > 3)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                else if (!madeContact && numPlayers == 2) cellsToBorderGrid[current] / 2
                                                 else 0
                                 )
                     }
@@ -713,7 +715,7 @@ object MyBot {
                                     { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
-                                    { if (!madeContact) it.site().strength else 0 },
+                                    { if (!madeContact && numPlayers == 2) it.site().strength else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
@@ -820,7 +822,7 @@ object MyBot {
                                     { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
-                                    { if (!madeContact) it.site().strength else 0 },
+                                    { if (!madeContact && numPlayers == 2) it.site().strength else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0 },
@@ -867,10 +869,20 @@ object MyBot {
                     }
                 }
 
+        idleStrength = gameMap
+                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
+                .map { it.site().strength }
+                .sum()
+
         stillMaxCells = gameMap
                 .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
                 .toSet()
-        stillMax = stillMaxCells.size
+
+        stillMax =
+                if (playerStats[id]?.strength == playerStats.map { it.value.strength }.max())
+                    idleStrength / 255
+                else
+                    stillMaxCells.size
     }
 
     // EXTENSIONS METHODS
