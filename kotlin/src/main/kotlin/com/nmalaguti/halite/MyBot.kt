@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv2"
+val BOT_NAME = "MyIdleStrengthBotv3"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -338,7 +338,7 @@ object MyBot {
 
         val myProduction = playerStats[id]?.production ?: 1
 
-        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
+        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5)
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
