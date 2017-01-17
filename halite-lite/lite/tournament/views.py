@@ -52,12 +52,28 @@ class MatchView(generic.DetailView):
 def whole_history(request):
     matches = Match.objects.all().prefetch_related('results__bot')
 
+    try:
+        num_players = int(request.GET.get('num_players'))
+    except (ValueError, TypeError):
+        num_players = None
+
+    try:
+        min_size = int(request.GET.get('min_size', 0))
+    except (ValueError, TypeError):
+        min_size = 0
+
+    try:
+        max_size = int(request.GET.get('max_size', 2500))
+    except (ValueError, TypeError):
+        max_size = 2500
+
     rankings = []
     num_matches = Counter()
     for match in matches:
         ranking = {}
         results = match.results.all()
-        if results.count() > 0:
+        if ((num_players is None or results.count() == num_players) and
+                min_size < match.width * match.height <= max_size):
             num_matches.update([result.bot.name for result in results])
             for result in results:
                 ranking[result.bot.name] = result.rank
@@ -67,10 +83,14 @@ def whole_history(request):
 
     normalizing_constant = sum(value for player, value in gammas.items())
     gammas = {player: value / normalizing_constant for player, value in gammas.items()}
-    gammas = [(player, gamma, num_matches[player]) for gamma, player in sorted([(v,k) for k,v in gammas.items()], reverse=True)]
+    gammas = [(player, gamma, num_matches[player]) for gamma, player in
+              sorted([(v, k) for k, v in gammas.items()], reverse=True)]
 
     return render(request, 'tournament/whole_history.html', {
         'gammas': gammas,
+        'num_players': num_players,
+        'min_size': min_size,
+        'max_size': max_size,
     })
 
 
