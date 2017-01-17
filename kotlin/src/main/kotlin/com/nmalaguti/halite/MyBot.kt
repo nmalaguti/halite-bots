@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyCanIDoBetterBotv11"
+val BOT_NAME = "MyCanIDoBetterBotv12"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -32,7 +32,7 @@ object MyBot {
     var numConnectedPlayers: Int = 0
     var hotSpots = setOf<Location>()
     lateinit var hotSpotsGrid: Grid
-    var useHotSpots = true
+    var useHotSpots = false
     var localProduction: Double = 0.0
     lateinit var strengthNeededGrid: Grid
     var minimumStrength = 0
@@ -92,7 +92,7 @@ object MyBot {
 
         logger.info("id: $id")
 
-        initHotSpots()
+//        initHotSpots()
 
         Networking.sendInit(BOT_NAME)
     }
