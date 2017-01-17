@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv3"
+val BOT_NAME = "MyIdleStrengthBotv4"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -229,8 +229,15 @@ object MyBot {
         walkCellsToEnemyGrid(gameMap.filter { it.site().isOtherPlayer() }.toMutableSet())
         logger.info(cellsToEnemyGrid.toString())
 
-        cellsToBorderGrid = Grid("cellsToBorderGrid") { 9999 }
-        walkCellsToBorderGrid(gameMap.filter { it.isInnerBorder() }.toMutableSet())
+        cellsToBorderGrid = Grid("cellsToBorderGrid") {
+            if (it.site().isMine()) 9999
+            else if (it.site().production == 0) 9999
+            else 0
+        }
+        walkCellsToBorderGrid(gameMap
+                .filter { it.isInnerBorder() }
+                .sortedByDescending { it.neighbors().filter { it.site().isEnvironment() }.map { it.site().production }.sum() }
+                .toMutableSet())
         logger.info(cellsToBorderGrid.toString())
 
         val replaceWithHotSpots = !madeContact &&
@@ -338,7 +345,7 @@ object MyBot {
 
         val myProduction = playerStats[id]?.production ?: 1
 
-        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5)
+        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
@@ -417,7 +424,7 @@ object MyBot {
 
     fun walkCellsToBorderGrid(openSet: MutableSet<Location>) {
         bfs(openSet, { current ->
-            if (current.isInnerBorder()) {
+            if (current.isInnerBorder() && current.neighbors().filter { it.site().isEnvironment() }.any { it.site().production > 0 }) {
                 cellsToBorderGrid[current] = 0
             } else {
                 cellsToBorderGrid[current] = Math.min(
@@ -617,7 +624,7 @@ object MyBot {
 
                     if (loc in sources) return@forEach
 
-                    if (loc.allNeighborsWithin(3).none { it.site().isOtherPlayer() }) {
+                    if (loc.neighborsAndSelf().none { it in enemyDamageTargets }) {
                         loc.neighbors()
                                 .filter { it.site().isCombat() }
                                 .filter {
@@ -876,7 +883,7 @@ object MyBot {
                 .toSet()
 
         stillMax =
-                if (playerStats[id]?.strength == playerStats.filter { if (numPlayers == 2) it.key != 0 else true }.map { it.value.strength }.max())
+                if (playerStats[id]?.strength == playerStats.filter { if (numPlayers < 3) it.key != 0 else true }.map { it.value.strength }.max())
                     idleStrength / 255
                 else
                     stillMaxCells.size
