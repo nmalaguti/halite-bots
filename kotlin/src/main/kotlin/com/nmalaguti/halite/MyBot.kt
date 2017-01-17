@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv4"
+val BOT_NAME = "MyIdleStrengthBotv5"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -29,6 +29,7 @@ object MyBot {
     var stillMaxCells = setOf<Location>()
     var madeContact: Boolean = false
     var numPlayers: Int = 0
+    var initialNumPlayers: Int = 0
     var numConnectedPlayers: Int = 0
     var hotSpots = setOf<Location>()
     lateinit var hotSpotsGrid: Grid
@@ -91,6 +92,8 @@ object MyBot {
         id = init.myID
 
         logger.info("id: $id")
+
+        initialNumPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
 
         if (useHotSpots) initHotSpots()
 
@@ -400,6 +403,7 @@ object MyBot {
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact && cellsToEnemyGrid[current] > 3)
                                                     (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                else if (!madeContact && initialNumPlayers == 2) cellsToBorderGrid[current] / 2
                                                 else 0
                                 )
                     }
