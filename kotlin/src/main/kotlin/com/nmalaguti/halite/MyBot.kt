@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv6"
+val BOT_NAME = "MyIdleStrengthBotv7"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -284,7 +284,7 @@ object MyBot {
                     if (range > 0) {
                         outerBorder.forEach {
                             if (distanceToEnemyGrid[it] == min) distanceToEnemyGrid[it] = 0
-                            else distanceToEnemyGrid[it] = ((distanceToEnemyGrid[it] - min) / result).toInt() + 2
+                            else distanceToEnemyGrid[it] = ((distanceToEnemyGrid[it] - min) / result).toInt() + 1
                         }
                     }
                 }
@@ -400,10 +400,15 @@ object MyBot {
                                         distanceToEnemyGrid[current],
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
-                                                if (madeContact && cellsToEnemyGrid[current] > 3)
-                                                    (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                else if (madeContact && cellsToEnemyGrid[current] <= 3) 0
-                                                else cellsToBorderGrid[current]
+                                                if (madeContact) {
+                                                    if (cellsToEnemyGrid[current] > 3)
+                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                    else 0
+                                                } else {
+                                                    if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
+                                                    else if (initialNumPlayers < 5) cellsToBorderGrid[current]
+                                                    else 0
+                                                }
                                 )
                     }
 
@@ -656,11 +661,13 @@ object MyBot {
                                 }
                                 .filter {
                                     if (it.site().isEnvironment() && it.site().strength > 0)
-                                        numPlayers == 2 && enemyDamageTargets[it]?.all { origin ->
-                                            val enemyStrength = playerStats[origin.origin.site().owner]?.strength ?: 0
-                                            val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
-                                            myStrength > enemyStrength
-                                        } ?: true && loc.site().strength > it.site().strength
+                                        initialNumPlayers > 2 &&
+                                                numPlayers == 2 &&
+                                                enemyDamageTargets[it]?.all { origin ->
+                                                    val enemyStrength = playerStats[origin.origin.site().owner]?.strength ?: 0
+                                                    val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
+                                                    myStrength > enemyStrength
+                                                } ?: true && loc.site().strength > it.site().strength
                                     else true
                                 }
                                 .filter {
