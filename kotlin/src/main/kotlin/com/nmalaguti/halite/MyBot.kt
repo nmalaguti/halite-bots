@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv7"
+val BOT_NAME = "MyIdleStrengthBotv8"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -33,13 +33,14 @@ object MyBot {
     var numConnectedPlayers: Int = 0
     var hotSpots = setOf<Location>()
     lateinit var hotSpotsGrid: Grid
-    var useHotSpots = false
+    var useHotSpots = true
     var localProduction: Double = 0.0
     lateinit var strengthNeededGrid: Grid
     var minimumStrength = 0
     lateinit var enemyDamageTargets: MutableMap<Location, MutableSet<Movement>>
     lateinit var enemyDamageStrength: MutableMap<Movement, Int>
     var idleStrength: Int = 0
+    lateinit var targetDistanceGrid: Grid
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -47,6 +48,8 @@ object MyBot {
     @JvmStatic fun main(args: Array<String>) {
         initializeLogging()
         init()
+
+        targetDistanceGrid = Grid("targetDistanceGrid") { 0 }
 
         // game loop
         while (true) {
@@ -404,11 +407,9 @@ object MyBot {
                                                     if (cellsToEnemyGrid[current] > 3)
                                                         (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                     else 0
-                                                } else {
-                                                    if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
-                                                    else if (initialNumPlayers < 5) cellsToBorderGrid[current]
-                                                    else 0
                                                 }
+                                                else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
+                                                else 0
                                 )
                     }
 
@@ -447,6 +448,7 @@ object MyBot {
     fun walkStrengthNeededGrid(openSet: MutableSet<Location>) {
         val targetMap = mutableMapOf<Location, Location>()
         val productionMap = mutableMapOf<Location, Pair<Int, MutableSet<Location>>>()
+        targetDistanceGrid = Grid("targetDistanceGrid") { 0 }
 
         dijkstras(
                 openSet,
@@ -468,7 +470,9 @@ object MyBot {
                             val target = targetMap[next]
                             val (distVisited, productionLocations) = productionMap[target] ?: 0 to mutableSetOf()
                             if (target != null) {
-                                val distance = gameMap.getDistance(current, target).toInt()
+                                val distance = targetDistanceGrid[next] + 1
+                                targetDistanceGrid[current] = distance
+
                                 if (distance > distVisited) {
                                     strengthNeededGrid[target] = Math.max(0, strengthNeededGrid[target] - productionLocations.sumBy { it.site().production })
                                     productionMap[target] = distance to productionLocations
@@ -489,6 +493,8 @@ object MyBot {
                             .filter { it.site().isMine() }
                             .sortedBy { it.site().strength }
                 })
+
+        logger.info(targetDistanceGrid.toString())
     }
 
     fun makeMoves() {
@@ -651,6 +657,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
+                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -658,17 +665,6 @@ object MyBot {
                                                     enemyDamageStrength[it]!! > loc.site().strength
                                         }
                                     } ?: true
-                                }
-                                .filter {
-                                    if (it.site().isEnvironment() && it.site().strength > 0)
-                                        initialNumPlayers > 2 &&
-                                                numPlayers == 2 &&
-                                                enemyDamageTargets[it]?.all { origin ->
-                                                    val enemyStrength = playerStats[origin.origin.site().owner]?.strength ?: 0
-                                                    val myStrength = playerStats[id]?.strength ?: 0 - it.site().strength
-                                                    myStrength > enemyStrength
-                                                } ?: true && loc.site().strength > it.site().strength
-                                    else true
                                 }
                                 .filter {
                                     if (it != loc && it.nextSite().isMine())
