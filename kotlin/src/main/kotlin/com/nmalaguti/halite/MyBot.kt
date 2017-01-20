@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyIdleStrengthBotv8"
+val BOT_NAME = "MyIdleStrengthBotv9"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -208,6 +208,9 @@ object MyBot {
 
     fun endGameLoop() {
         Networking.sendFrame(allMoves)
+//        val turnTime = System.currentTimeMillis() - start
+//        if (turnTime > 333) logger.warning("turn time: $turnTime ms")
+//        else logger.info("turn time: $turnTime ms")
     }
 
     // MOVE LOGIC
@@ -350,7 +353,7 @@ object MyBot {
 
         val myProduction = playerStats[id]?.production ?: 1
 
-        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
+        return Math.min(128, (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax)
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
@@ -403,12 +406,8 @@ object MyBot {
                                         distanceToEnemyGrid[current],
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
-                                                if (madeContact) {
-                                                    if (cellsToEnemyGrid[current] > 3)
-                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                    else 0
-                                                }
-                                                else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
+                                                if (madeContact && cellsToEnemyGrid[current] > 3)
+                                                    (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                 else 0
                                 )
                     }
@@ -450,10 +449,31 @@ object MyBot {
         val productionMap = mutableMapOf<Location, Pair<Int, MutableSet<Location>>>()
         targetDistanceGrid = Grid("targetDistanceGrid") { 0 }
 
-        dijkstras(
-                openSet,
+        val priorityQueue = PriorityQueue<Location>(compareBy(
                 { distanceToEnemyGrid[it] },
-                { current ->
+                { cellsToBorderGrid[it] },
+                { -it.site().strength },
+                { it.x },
+                { it.y }
+        ))
+        priorityQueue.addAll(openSet)
+
+        val closedSet = mutableSetOf<Location>()
+        while (priorityQueue.isNotEmpty()) {
+            val current = priorityQueue.poll()
+//            val current = openSet.minWith(compareBy(
+//                    { distanceToEnemyGrid[it] },
+//                    { -it.site().production },
+//                    { -it.site().strength },
+//                    { cellsToBorderGrid[it] },
+//                    { it.x },
+//                    { it.y }
+//            ))
+            if (current != null) {
+//                openSet.remove(current)
+                if (current !in closedSet) {
+                    closedSet.add(current)
+
                     if (current.isOuterBorder()) {
                         strengthNeededGrid[current] = current.site().strength
                         targetMap[current] = current
@@ -470,6 +490,7 @@ object MyBot {
                             val target = targetMap[next]
                             val (distVisited, productionLocations) = productionMap[target] ?: 0 to mutableSetOf()
                             if (target != null) {
+//                                val distance = gameMap.getDistance(current, target).toInt() + 1
                                 val distance = targetDistanceGrid[next] + 1
                                 targetDistanceGrid[current] = distance
 
@@ -489,10 +510,11 @@ object MyBot {
                         }
                     }
 
-                    current.neighbors()
-                            .filter { it.site().isMine() }
-                            .sortedBy { it.site().strength }
-                })
+                    priorityQueue.addAll(current.neighbors().filter { it.site().isMine() })
+                    openSet.addAll(current.neighbors().filter { it.site().isMine() })
+                }
+            }
+        }
 
         logger.info(targetDistanceGrid.toString())
     }
