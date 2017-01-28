@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyNapBot"
+val BOT_NAME = "MyPureNapBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -326,8 +326,7 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
-                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.max(it.site().production * 5, minimumStrength)
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -371,8 +370,7 @@ object MyBot {
 
         val myProduction = playerStats[id]?.production ?: 1
 
-        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) +
-                if (madeContact) idleStrength / 128 else stillMax
+        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
