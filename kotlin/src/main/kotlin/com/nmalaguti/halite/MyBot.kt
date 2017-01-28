@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyPureStrengthBot"
+val BOT_NAME = "MyKrakenBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -292,6 +292,26 @@ object MyBot {
                     }
                 }
             }
+        }
+
+        // nap
+
+        if (madeContact) {
+            gameMap
+                    .filter { it.isOuterBorder() }
+                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                    .filter {
+                        it.neighbors()
+                                .any {
+                                    (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
+                                            (it.site().isCombat() && it.neighbors()
+                                                    .filter { it.site().isOtherPlayer() }
+                                                    .any { it.site().owner !in connectedPlayers })
+                                }
+                    }
+                    .forEach {
+                        distanceToEnemyGrid[it] = 255
+                    }
         }
 
         // final step
@@ -709,6 +729,13 @@ object MyBot {
                     }
                 }
 
+        var waitForStrength: Boolean
+
+        if (!madeContact) waitForStrength = true
+        else {
+            waitForStrength = (turn % 15) != 0
+        }
+
         gameMap
                 .filter { it.site().isMine() && it !in sources }
                 .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
@@ -729,7 +756,9 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > strengthNeededGrid[loc] &&
+                                    loc.site().strength > it.site().production &&
+                                            ((it in lastTurnMoves && it.site().strength > it.site().production * 2) ||
+                                                    (if (waitForStrength) loc.site().strength > strengthNeededGrid[loc] else true)) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
@@ -835,7 +864,8 @@ object MyBot {
                                     nextSite.strength < loc.site().strength
                                 } else {
                                     // mine
-                                    loc.site().strength > strengthNeededGrid[loc] &&
+                                    loc.site().strength > it.site().production &&
+                                            (it in lastTurnMoves || if (waitForStrength) loc.site().strength > strengthNeededGrid[loc] else true) &&
                                             (nextSite.strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc))
                                 }
                             }
