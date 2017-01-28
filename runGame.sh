@@ -20,14 +20,32 @@ rm -f *.log* *.hlt
 # https://halite.io/game.php?replay=ar1483380454-1829563253.hlt
 # https://halite.io/game.php?replay=ar1483393284-1775054597.hlt
 # https://halite.io/game.php?replay=ar1483393715-2206445183.hlt
+# https://halite.io/game.php?replay=ar1484675430-4021084152.hlt
 
-#./halite -d "35 35" \
-#    "tournament/bots/available/finebattlebotv2-nobruiseexpand/run.sh" \
+#./halite -d "30 30" -s 694123085 \
+#    "tournament/bots/available/compressbugfixbot/run.sh" \
+#    "tournament/bots/available/finebattlebotv2-lessbruise/run.sh" \
+#    "tournament/bots/available/finebattlebotv2/run.sh" \
+#    "tournament/bots/available/superhungrybot/run.sh" \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
-./halite -d "40 40" -s 193709268 \
-    "tournament/bots/available/finebattlebotv2-nobruiseexpand/run.sh" \
+./halite -d "50 50" -s 3971582041 \
+    "tournament/bots/available/canidobetterbotv19/run.sh" \
     "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "24 24" -s 1681841247 \
+#    "tournament/bots/available/canidobetterbotv19/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "40 40" -s 2428252705 \
+#    "tournament/bots/available/frankensteinbot/run.sh" \
+#    "tournament/bots/available/finebattlebotv2-lessbruise/run.sh" \
+#    "tournament/bots/available/fastexpandbot/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+
+#./halite -d "40 40" -s 193709268 \
+#    "tournament/bots/available/finebattlebotv2-nobruiseexpand/run.sh" \
+#    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
 
 #./halite -d "40 40" -s 146658805 \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
