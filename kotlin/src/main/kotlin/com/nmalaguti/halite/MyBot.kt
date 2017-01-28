@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyPureNapBot"
+val BOT_NAME = "MyPureStrengthBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -294,26 +294,6 @@ object MyBot {
             }
         }
 
-        // nap
-
-        if (madeContact) {
-            gameMap
-                    .filter { it.isOuterBorder() }
-                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                    .filter {
-                        it.neighbors()
-                                .any {
-                                    (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
-                                            (it.site().isCombat() && it.neighbors()
-                                                    .filter { it.site().isOtherPlayer() }
-                                                    .any { it.site().owner !in connectedPlayers })
-                                }
-                    }
-                    .forEach {
-                        distanceToEnemyGrid[it] = 255
-                    }
-        }
-
         // final step
 
         walkDistanceToEnemyGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
@@ -326,7 +306,8 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                Math.max(it.site().production * 5, minimumStrength)
+                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
+                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -370,7 +351,8 @@ object MyBot {
 
         val myProduction = playerStats[id]?.production ?: 1
 
-        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) + stillMax
+        return (Math.min(10, myProduction / bestTargetStrength) * MINIMUM_STRENGTH / 5) +
+                if (madeContact) idleStrength / 128 else stillMax
     }
 
     fun directedWalk(loc: Location): Pair<Int, Int> {
