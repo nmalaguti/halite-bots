@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySharpFocusBot"
+val BOT_NAME = "MyJustSquaredBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -326,8 +326,7 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
-                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.min(250, Math.max(it.site().production * it.site().production, minimumStrength))
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -426,10 +425,8 @@ object MyBot {
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact) {
-                                                    if (cellsToEnemyGrid[current] > 3) {
-                                                        if (numPlayers < 5) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                        else 1
-                                                    }
+                                                    if (cellsToEnemyGrid[current] > 3)
+                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                     else 0
                                                 }
                                                 else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
