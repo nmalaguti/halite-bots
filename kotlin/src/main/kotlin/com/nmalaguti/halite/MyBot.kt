@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyWaitToAttackBot"
+val BOT_NAME = "MyParameterMixBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -320,7 +320,7 @@ object MyBot {
                                 } ?: 0.0
                             }
                             .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 1.1) distanceToEnemyGrid[it] = 255
+                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
                 }
 
         if (madeContact) {
@@ -353,8 +353,14 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
-                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
+                Math.min(
+                        200,
+                        if (!madeContact) {
+                            if (it.site().production > 5 && initialNumPlayers > 3) Math.max(it.site().production * it.site().production, minimumStrength)
+                            else Math.max(it.site().production * 5, minimumStrength)
+                        }
+                        else Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength)
+                )
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -418,7 +424,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / 4) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, numPlayers)) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
