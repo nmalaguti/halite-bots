@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyMinVariableDirWalkBot"
+val BOT_NAME = "MyWaitToAttackBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -296,6 +296,33 @@ object MyBot {
 
         // nap
 
+        gameMap
+                .filter { it.isOuterBorder() }
+                .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                .filter {
+                    it.neighbors()
+                            .any {
+                                (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
+                                        (it.site().isCombat() && it.neighbors()
+                                                .filter { it.site().isOtherPlayer() }
+                                                .any { it.site().owner !in connectedPlayers })
+                            }
+                }
+                .forEach {
+                    val myStrOverTer = playerStats[id]?.let {
+                        it.strength / it.territory.toDouble()
+                    } ?: 0.0
+                    val theirStrOverTers = it.neighbors()
+                            .filter { it.site().isOtherPlayer() }
+                            .map {
+                                playerStats[it.site().owner]?.let {
+                                    it.strength / it.territory.toDouble()
+                                } ?: 0.0
+                            }
+                            .max() ?: 0.0
+                    if (madeContact || myStrOverTer < theirStrOverTers * 1.1) distanceToEnemyGrid[it] = 255
+                }
+
         if (madeContact) {
             gameMap
                     .filter { it.isOuterBorder() }
@@ -391,7 +418,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, (numPlayers + 1))) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / 4) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
