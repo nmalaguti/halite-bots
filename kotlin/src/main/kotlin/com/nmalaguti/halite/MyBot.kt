@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyInBetweenSquaredBot"
+val BOT_NAME = "MyVariableDirWalkBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -326,14 +326,8 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                Math.min(
-                        255,
-                        if (!madeContact) {
-                            if (it.site().production > 5) Math.max(it.site().production * it.site().production, minimumStrength)
-                            else Math.max(it.site().production * 5, minimumStrength)
-                        }
-                        else Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength)
-                )
+                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
+                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -397,7 +391,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / 4) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / (numPlayers + 1)) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
