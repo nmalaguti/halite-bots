@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyVariableDirWalkBot"
+val BOT_NAME = "MyMinVariableDirWalkBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -391,7 +391,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / (numPlayers + 1)) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, (numPlayers + 1))) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
