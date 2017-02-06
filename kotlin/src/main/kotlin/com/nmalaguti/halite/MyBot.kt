@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyParameterMixBot"
+val BOT_NAME = "MySharpParameterMixBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -459,8 +459,10 @@ object MyBot {
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact) {
-                                                    if (cellsToEnemyGrid[current] > 3)
-                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                    if (cellsToEnemyGrid[current] > 3) {
+                                                        if (numPlayers < 5) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                        else 1
+                                                    }
                                                     else 0
                                                 }
                                                 else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
