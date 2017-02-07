@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySharpParameterMix2Bot"
+val BOT_NAME = "MyPunchThroughBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -381,7 +381,6 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
-                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -459,10 +458,8 @@ object MyBot {
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact) {
-                                                    if (cellsToEnemyGrid[current] > 3) {
-                                                        if (numPlayers < 5) (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                        else 1
-                                                    }
+                                                    if (cellsToEnemyGrid[current] > 3)
+                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                     else 0
                                                 }
                                                 else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
@@ -699,7 +696,7 @@ object MyBot {
                         loc.neighbors()
                                 .filter { it.site().isCombat() }
                                 .filter {
-                                    loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
+                                    loc.site().strength > loc.site().production * 2 &&
                                             it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH
                                 }
                                 .sortedWith(compareBy(
@@ -714,7 +711,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                // .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -724,7 +721,9 @@ object MyBot {
                                     } ?: true
                                 }
                                 .filter {
-                                    if (it != loc && it.nextSite().isMine())
+                                    if (it.site().isEnvironment() && it.site().strength > 0)
+                                        loc.site().strength > it.site().strength
+                                    else if (it != loc && it.nextSite().isMine())
                                         it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
@@ -989,7 +988,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else (this.strength / (this.production + stillMax).toDouble()).toInt()
+        else (this.strength / (this.production + (stillMax / Math.max(1, numPlayers - 1).toDouble()))).toInt()
     }
     else 9999
 
