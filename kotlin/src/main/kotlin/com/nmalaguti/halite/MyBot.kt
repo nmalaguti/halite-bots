@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyThugClassicDuoBot"
+val BOT_NAME = "MySpaghettiBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -41,6 +41,7 @@ object MyBot {
     var idleStrength: Int = 0
     lateinit var targetDistanceGrid: Grid
     var connectedPlayers: Set<Int> = setOf()
+    lateinit var combatValuesGrid: Grid
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -316,6 +317,28 @@ object MyBot {
                     distanceToEnemyGrid[it] = 255
                 }
 
+        val strengths = mutableMapOf<Int, Int>()
+        connectedPlayers
+                .filterNot { it == id }
+                .filter { it in playerStats }
+                .map { it to playerStats[it]!!.let { it.strength * it.territory * it.production } }
+                .sortedBy { it.second }
+                .map { it.first }
+                .forEachIndexed { i, owner -> strengths[owner] = i }
+
+        combatValuesGrid = Grid("combatValuesGrid") {
+            if (it.site().isOtherPlayer()) strengths[it.site().owner] ?: 0
+            else -1
+        }
+
+        walkCombatValuesGrid(gameMap.filter { it.site().isOtherPlayer() }.toMutableSet())
+
+        logger.info(combatValuesGrid.toString())
+
+        gameMap
+                .filter { it.site().isCombat() }
+                .forEach { distanceToEnemyGrid[it] = combatValuesGrid[it] }
+
         // final step
 
         walkDistanceToEnemyGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
@@ -356,7 +379,6 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
-                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -461,6 +483,14 @@ object MyBot {
             }
 
             current.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+        })
+    }
+
+    fun walkCombatValuesGrid(openSet: MutableSet<Location>) {
+        bfs(openSet, { current ->
+            combatValuesGrid[current] = current.neighbors().map { combatValuesGrid[it] }.max()!!
+
+            current.neighbors().filterNot { (it.site().isEnvironment() && it.site().strength > 0) || it.site().isMine() }
         })
     }
 
@@ -652,7 +682,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-//                blackoutCells.add(source)
+                if (initialNumPlayers == 2) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -690,7 +720,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                // .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -700,11 +730,14 @@ object MyBot {
                                     } ?: true
                                 }
                                 .filter {
-                                    if (it != loc && it.nextSite().isMine())
+                                    if (it.site().isEnvironment() && it.site().strength > 0)
+                                        loc.site().strength > it.site().strength
+                                    else if (it != loc && it.nextSite().isMine())
                                         it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
                                 .sortedWith(compareBy(
+                                        { if (it.site().isEnvironment() && it.site().strength > 0) 1 else 0 },
                                         {
                                             enemyDamageTargets[it]
                                                     ?.groupBy { it.origin }
@@ -722,7 +755,6 @@ object MyBot {
 //                                                    }?.sum() ?: 0
 //                                        },
                                         { if (it.site().isMine()) it.site().strength else 0 },
-                                        { if (it.site().isEnvironment() && it.site().strength > 0) 1 else 0 },
                                         { cellsToEnemyGrid[it] },
                                         { -it.site().production },
                                         { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size }
@@ -847,7 +879,7 @@ object MyBot {
                 }
 
         gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
+                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
                 .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -855,7 +887,7 @@ object MyBot {
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
-                            .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
+                            .filter { cellsToEnemyGrid[it] < cellsToEnemyGrid[loc] }
                             .filter {
                                 val nextSite = nextMap.getSite(it)
 
@@ -871,8 +903,8 @@ object MyBot {
                                 }
                             }
                             .sortedWith(compareBy(
-                                    { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
+                                    { distanceToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
@@ -881,37 +913,6 @@ object MyBot {
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }
                             ))
-                            .let {
-                                if (DEBUG_TIE_BREAKERS) {
-                                    it
-                                            .map {
-                                                it to listOf(
-                                                        distanceToEnemyGrid[it],
-                                                        if (it in directedGrid) directedGrid[it]!!.first else 0,
-                                                        if (madeContact) 0 else -it.site().production,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
-                                                        -it.site().overkill(),
-                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size
-                                                )
-                                            }
-                                            .groupBy { it.second }
-                                            .let {
-                                                if (it.any { it.value.size > 1 }) {
-                                                    val builder = StringBuilder()
-
-                                                    builder.appendln("tie breaker")
-                                                    it.values.flatten().forEach {
-                                                        builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-                                                    }
-                                                    logger.info(builder.toString())
-                                                }
-                                            }
-                                }
-
-                                it
-                            }
                             .firstOrNull()
 
                     if (target != null) {
