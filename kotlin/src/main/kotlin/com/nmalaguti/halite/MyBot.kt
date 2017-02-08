@@ -255,7 +255,7 @@ object MyBot {
         } else {
             distanceToEnemyGrid = Grid("distanceToEnemyGrid") { it.site().resource() }
 
-            if (!madeContact || initialNumPlayers == 2) {
+            if (!madeContact || numPlayers == 2) {
                 directedGrid = gameMap
                         .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
                         .map { it to directedWalk(it) }
@@ -434,7 +434,7 @@ object MyBot {
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact) {
-                                                    if (initialNumPlayers == 2) {
+                                                    if (numPlayers == 2) {
                                                         if (cellsToEnemyGrid[current] > 3)
                                                             (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
                                                         else 0
@@ -965,7 +965,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else (this.strength / (this.production + if (initialNumPlayers == 2) stillMax else 0).toDouble()).toInt()
+        else (this.strength / (this.production + if (numPlayers == 2) stillMax else 0).toDouble()).toInt()
     }
     else 9999
 
