@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyThugClassicBot"
+val BOT_NAME = "MyThugClassicPunchBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -354,7 +354,6 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
-                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -681,7 +680,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                // .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -691,7 +690,9 @@ object MyBot {
                                     } ?: true
                                 }
                                 .filter {
-                                    if (it != loc && it.nextSite().isMine())
+                                    if (it.site().isEnvironment() && it.site().strength > 0)
+                                        loc.site().strength > it.site().strength
+                                    else if (it != loc && it.nextSite().isMine())
                                         it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
