@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySpaghettiBot"
+val BOT_NAME = "MySpaghettiStillBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -379,6 +379,10 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
+                            .filter {
+                                if (initialNumPlayers == 2) !(it.site().isEnvironment() && it.site().strength > 0)
+                                else true
+                            }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -720,7 +724,11 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                // .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                                .filter {
+                                    if (initialNumPlayers == 2)
+                                        !(it.site().isEnvironment() && it.site().strength > 0)
+                                    else true
+                                }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -966,7 +974,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else (this.strength / (this.production + if (numPlayers == 2) stillMax else 0).toDouble()).toInt()
+        else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
 
