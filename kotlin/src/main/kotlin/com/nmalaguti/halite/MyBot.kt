@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyLastGaspTooBot"
+val BOT_NAME = "MyBoxOfRocksBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -297,33 +297,6 @@ object MyBot {
 
         // nap
 
-        gameMap
-                .filter { it.isOuterBorder() }
-                .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                .filter {
-                    it.neighbors()
-                            .any {
-                                (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
-                                        (it.site().isCombat() && it.neighbors()
-                                                .filter { it.site().isOtherPlayer() }
-                                                .any { it.site().owner !in connectedPlayers })
-                            }
-                }
-                .forEach {
-                    val myStrOverTer = playerStats[id]?.let {
-                        it.strength / it.territory.toDouble()
-                    } ?: 0.0
-                    val theirStrOverTers = it.neighbors()
-                            .filter { it.site().isOtherPlayer() }
-                            .map {
-                                playerStats[it.site().owner]?.let {
-                                    it.strength / it.territory.toDouble()
-                                } ?: 0.0
-                            }
-                            .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
-                }
-
         if (madeContact) {
             gameMap
                     .filter { it.isOuterBorder() }
@@ -376,14 +349,8 @@ object MyBot {
         // build strength needed grid
         strengthNeededGrid = Grid("strengthNeededGrid") {
             if (it.site().isMine()) {
-                Math.min(
-                        200,
-                        if (!madeContact) {
-                            if (it.site().production > 5 && initialNumPlayers > 3) Math.max(it.site().production * it.site().production, minimumStrength)
-                            else Math.max(it.site().production * 5, minimumStrength)
-                        }
-                        else Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength)
-                )
+                if (!madeContact) Math.max(it.site().production * 5, minimumStrength)
+                else Math.min(160, Math.max(it.site().production * (Math.max(0, cellsToBorderGrid[it] - 2) + 5), minimumStrength))
             } else if (it.isOuterBorder()) {
                 it.site().strength
             } else 9999
@@ -447,7 +414,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, numPlayers)) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, (numPlayers + 1))) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
@@ -705,7 +672,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-//                blackoutCells.add(source)
+                if (!madeContact) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
