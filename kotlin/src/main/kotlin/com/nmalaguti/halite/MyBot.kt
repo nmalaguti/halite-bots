@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBoxOfRocksBlackoutBot"
+val BOT_NAME = "MyShoveBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -532,6 +532,8 @@ object MyBot {
                         source.site().isMine() &&
                         this !in sources && source !in sources &&
                         this !in destinations && source !in destinations &&
+                        source !in enemyDamageTargets &&
+                        this !in enemyDamageTargets &&
                         ((source.site().strength == 255 && this.site().strength < 255) ||
                                 this.site().strength + 15 < source.site().strength)
 
@@ -589,8 +591,40 @@ object MyBot {
             }
         }
 
-        fun finalizeMove(source: Location, target: Location, addToBattleBlackout: Boolean, preventSwaps: Boolean) {
-            if (target.swappable(source) &&
+        fun finalizeMove(source: Location, target: Location, addToBattleBlackout: Boolean, preventSwaps: Boolean, shove: Boolean) {
+            if (shove && target.site().isMine() &&
+                    nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
+
+                var nextTarget = target.neighbors()
+                        .filter { it != source && it.site().isMine() && it !in sources && it !in destinations }
+                        .sortedWith(compareBy({ -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
+                        .firstOrNull()
+
+                if (nextTarget == null) {
+                    nextTarget = target.neighbors()
+                            .filter { it != source && it !in sources && it !in destinations }
+                            .sortedWith(compareBy({ -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
+                            .firstOrNull()
+                }
+
+                val move = moveTowards(source, target)
+
+                updateNextMap(move)
+
+                allMoves.add(move)
+
+                if (addToBattleBlackout) battleBlackout.add(source)
+                // blackoutCells.add(source)
+
+                sources.put(source, move.dir)
+                destinations.add(target)
+
+                if (nextTarget == null) {
+                    logger.warning("target $target could not be shoved anymore.")
+                } else {
+                    finalizeMove(target, nextTarget, false, false, true)
+                }
+            } else if (!shove && target.swappable(source) &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
 
                 enemyDamageTargets[source]?.forEach {
@@ -641,7 +675,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-                blackoutCells.add(source)
+                // blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -673,7 +707,7 @@ object MyBot {
                                 ))
                                 .firstOrNull()
                                 ?.let { target ->
-                                    finalizeMove(loc, target, false, false)
+                                    finalizeMove(loc, target, false, false, true)
                                 }
 
                     } else {
@@ -690,7 +724,11 @@ object MyBot {
                                 }
                                 .filter {
                                     if (it != loc && it.nextSite().isMine())
-                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
+                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH ||
+                                                it.swappable(loc) ||
+                                                (it.nextSite().strength + loc.site().strength >= MAXIMUM_STRENGTH &&
+                                                        it !in sources &&
+                                                        it !in destinations)
                                     else true
                                 }
                                 .sortedWith(compareBy(
@@ -719,7 +757,7 @@ object MyBot {
                                 .firstOrNull()
 
                         if (target != null) {
-                            finalizeMove(loc, target, true, false)
+                            finalizeMove(loc, target, true, false, true)
                         } else {
                             enemyDamageTargets[loc]?.forEach {
                                 enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
@@ -799,7 +837,7 @@ object MyBot {
 
                     if (target != null) {
                         if (target in blackoutCells && loc.site().strength < 255) logger.warning("Want to move $loc to $target but it is a blackout cell and source doesn't have 255 strength")
-                        finalizeMove(loc, target, false, true)
+                        finalizeMove(loc, target, false, true, false)
                     }
                 }
 
@@ -831,7 +869,7 @@ object MyBot {
                             }
                             .firstOrNull()
                             ?.forEach {
-                                finalizeMove(it, loc, false, true)
+                                finalizeMove(it, loc, false, true, false)
                             }
                 }
 
@@ -874,7 +912,7 @@ object MyBot {
 
                     if (target != null) {
                         if (target in blackoutCells && loc.site().strength < 255) logger.warning("Want to move $loc to $target but it is a blackout cell and source doesn't have 255 strength")
-                        finalizeMove(loc, target, false, true)
+                        finalizeMove(loc, target, false, true, false)
                     }
                 }
 
