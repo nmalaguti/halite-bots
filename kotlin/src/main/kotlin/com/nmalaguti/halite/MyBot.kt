@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBoxOfRocksEqualBot"
+val BOT_NAME = "MyBoxOfRocksBlackoutBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -641,7 +641,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-                if (!madeContact) blackoutCells.add(source)
+                blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
