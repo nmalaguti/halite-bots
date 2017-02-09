@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyBoxOfRocksBot"
+val BOT_NAME = "MyBoxOfRocksEqualBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -41,7 +41,6 @@ object MyBot {
     var idleStrength: Int = 0
     lateinit var targetDistanceGrid: Grid
     var connectedPlayers: Set<Int> = setOf()
-    lateinit var combatValuesGrid: Grid
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -315,28 +314,6 @@ object MyBot {
                     }
         }
 
-        val strengths = mutableMapOf<Int, Int>()
-        connectedPlayers
-                .filterNot { it == id }
-                .filter { it in playerStats }
-                .map { it to playerStats[it]!!.let { it.strength * it.territory * it.production } }
-                .sortedBy { it.second }
-                .map { it.first }
-                .forEachIndexed { i, owner -> strengths[owner] = i }
-
-        combatValuesGrid = Grid("combatValuesGrid") {
-            if (it.site().isOtherPlayer()) strengths[it.site().owner] ?: 0
-            else -1
-        }
-
-        walkCombatValuesGrid(gameMap.filter { it.site().isOtherPlayer() }.toMutableSet())
-
-        logger.info(combatValuesGrid.toString())
-
-        gameMap
-                .filter { it.site().isCombat() }
-                .forEach { distanceToEnemyGrid[it] = combatValuesGrid[it] }
-
         // final step
 
         walkDistanceToEnemyGrid(gameMap.filter { it.isOuterBorder() }.toMutableSet())
@@ -473,14 +450,6 @@ object MyBot {
             }
 
             current.neighbors().filterNot { it.site().isEnvironment() && it.site().strength > 0 }
-        })
-    }
-
-    fun walkCombatValuesGrid(openSet: MutableSet<Location>) {
-        bfs(openSet, { current ->
-            combatValuesGrid[current] = current.neighbors().map { combatValuesGrid[it] }.max()!!
-
-            current.neighbors().filterNot { (it.site().isEnvironment() && it.site().strength > 0) || it.site().isMine() }
         })
     }
 
