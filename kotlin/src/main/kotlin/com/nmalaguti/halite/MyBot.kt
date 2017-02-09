@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MySpaghettiStillBot"
+val BOT_NAME = "MyLastGaspBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -256,21 +256,17 @@ object MyBot {
         } else {
             distanceToEnemyGrid = Grid("distanceToEnemyGrid") { it.site().resource() }
 
-            if (!madeContact || numPlayers == 2) {
-                directedGrid = gameMap
-                        .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
-                        .map { it to directedWalk(it) }
-                        .toMap()
+            directedGrid = gameMap
+                    .filter { it.isOuterBorder() && it.site().isEnvironment() && it.site().strength > 0 }
+                    .map { it to directedWalk(it) }
+                    .toMap()
 
-                directedGrid.forEach {
-                    val (loc, value) = it
+            directedGrid.forEach {
+                val (loc, value) = it
 
-                    if (value.second <= distanceToEnemyGrid[loc]) {
-                        distanceToEnemyGrid[loc] = value.second
-                    }
+                if (value.second <= distanceToEnemyGrid[loc]) {
+                    distanceToEnemyGrid[loc] = value.second
                 }
-            } else {
-                directedGrid = mapOf()
             }
 
             if (!madeContact) {
@@ -379,10 +375,7 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
-                            .filter {
-                                if (initialNumPlayers == 2) !(it.site().isEnvironment() && it.site().strength > 0)
-                                else true
-                            }
+                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -724,11 +717,7 @@ object MyBot {
                     } else {
                         val target = loc.neighbors()
                                 .filter { it !in battleBlackout }
-                                .filter {
-                                    if (initialNumPlayers == 2)
-                                        !(it.site().isEnvironment() && it.site().strength > 0)
-                                    else true
-                                }
+                                .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
                                         it.value.any {
@@ -738,14 +727,11 @@ object MyBot {
                                     } ?: true
                                 }
                                 .filter {
-                                    if (it.site().isEnvironment() && it.site().strength > 0)
-                                        loc.site().strength > it.site().strength
-                                    else if (it != loc && it.nextSite().isMine())
+                                    if (it != loc && it.nextSite().isMine())
                                         it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
                                     else true
                                 }
                                 .sortedWith(compareBy(
-                                        { if (it.site().isEnvironment() && it.site().strength > 0) 1 else 0 },
                                         {
                                             enemyDamageTargets[it]
                                                     ?.groupBy { it.origin }
@@ -763,6 +749,7 @@ object MyBot {
 //                                                    }?.sum() ?: 0
 //                                        },
                                         { if (it.site().isMine()) it.site().strength else 0 },
+                                        { if (it.site().isEnvironment() && it.site().strength > 0) 1 else 0 },
                                         { cellsToEnemyGrid[it] },
                                         { -it.site().production },
                                         { -it.neighbors().filter { nextMap.getSite(it).isOtherPlayer() }.size }
@@ -974,7 +961,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else (this.strength / (this.production + stillMax).toDouble()).toInt()
+        else (this.strength / (this.production + (stillMax / Math.max(1, numPlayers - 1).toDouble()))).toInt()
     }
     else 9999
 
