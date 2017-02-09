@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyLastGaspBot"
+val BOT_NAME = "MyLastGaspTooBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -310,8 +310,37 @@ object MyBot {
                             }
                 }
                 .forEach {
-                    distanceToEnemyGrid[it] = 255
+                    val myStrOverTer = playerStats[id]?.let {
+                        it.strength / it.territory.toDouble()
+                    } ?: 0.0
+                    val theirStrOverTers = it.neighbors()
+                            .filter { it.site().isOtherPlayer() }
+                            .map {
+                                playerStats[it.site().owner]?.let {
+                                    it.strength / it.territory.toDouble()
+                                } ?: 0.0
+                            }
+                            .max() ?: 0.0
+                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
                 }
+
+        if (madeContact) {
+            gameMap
+                    .filter { it.isOuterBorder() }
+                    .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                    .filter {
+                        it.neighbors()
+                                .any {
+                                    (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
+                                            (it.site().isCombat() && it.neighbors()
+                                                    .filter { it.site().isOtherPlayer() }
+                                                    .any { it.site().owner !in connectedPlayers })
+                                }
+                    }
+                    .forEach {
+                        distanceToEnemyGrid[it] = 255
+                    }
+        }
 
         val strengths = mutableMapOf<Int, Int>()
         connectedPlayers
@@ -453,12 +482,9 @@ object MyBot {
                                         1 +
                                                 current.neighbors().map { distanceToEnemyGrid[it] }.min()!! +
                                                 if (madeContact) {
-                                                    if (numPlayers == 2) {
-                                                        if (cellsToEnemyGrid[current] > 3)
-                                                            (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
-                                                        else 0
-                                                    }
-                                                    else 1
+                                                    if (cellsToEnemyGrid[current] > 3)
+                                                        (Math.max(0.0, Math.log(current.site().production.toDouble() / Math.log(2.0))).toInt())
+                                                    else 0
                                                 }
                                                 else if (initialNumPlayers == 2) cellsToBorderGrid[current] / 2
                                                 else 0
@@ -679,7 +705,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-                if (initialNumPlayers == 2) blackoutCells.add(source)
+//                blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -961,7 +987,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else (this.strength / (this.production + (stillMax / Math.max(1, numPlayers - 1).toDouble()))).toInt()
+        else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
 
