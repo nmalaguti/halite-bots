@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveFinerBattleBot"
+val BOT_NAME = "MyShoveBetterBattleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -723,12 +723,12 @@ object MyBot {
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
-                                        it.value.all {
+                                        it.value.filterNot {
                                             if (it.origin.site().strength != enemyDamageStrength[it])
                                                 enemyDamageStrength[it]!! > loc.site().strength ||
-                                                        it.origin.site().strength < 64
+                                                        it.origin.site().strength < 16
                                             else true
-                                        }
+                                        }.size < 2
                                     } ?: true
                                 }
                                 .filter {
@@ -940,11 +940,11 @@ object MyBot {
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
         else {
-            val onBorder = this.isEnvironment() &&
-                    this.strength > 0 &&
-                    this.loc.neighbors().any { it.site().isCombat() || it.site().isOtherPlayer() }
+//            val onBorder = this.isEnvironment() &&
+//                    this.strength > 0 &&
+//                    this.loc.neighbors().any { it.site().isCombat() || it.site().isOtherPlayer() }
 
-            (this.strength / (this.production + stillMax).toDouble()).toInt() / (if (onBorder) 2 else 1)
+            (this.strength / (this.production + stillMax).toDouble()).toInt()/* / (if (onBorder) 2 else 1)*/
         }
     }
     else 9999
