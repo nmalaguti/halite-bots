@@ -3,13 +3,12 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveBlackBorderBot"
+val BOT_NAME = "MyShoveFinerBattleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
 val MAXIMUM_STRENGTH = 256
-val DEBUG_TIE_BREAKERS = false
 
 object MyBot {
     lateinit var gameMap: GameMap
@@ -724,9 +723,11 @@ object MyBot {
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
-                                        it.value.any {
-                                            it.origin.site().strength == enemyDamageStrength[it] ||
-                                                    enemyDamageStrength[it]!! > loc.site().strength
+                                        it.value.all {
+                                            if (it.origin.site().strength != enemyDamageStrength[it])
+                                                enemyDamageStrength[it]!! > loc.site().strength ||
+                                                        it.origin.site().strength < 64
+                                            else true
                                         }
                                     } ?: true
                                 }
@@ -810,37 +811,6 @@ object MyBot {
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }
                             ))
-                            .let {
-                                if (DEBUG_TIE_BREAKERS) {
-                                    it
-                                            .map {
-                                                it to listOf(
-                                                        distanceToEnemyGrid[it],
-                                                        if (it in directedGrid) directedGrid[it]!!.first else 0,
-                                                        if (madeContact) 0 else -it.site().production,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
-                                                        -it.site().overkill(),
-                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size
-                                                )
-                                            }
-                                            .groupBy { it.second }
-                                            .let {
-                                                if (it.any { it.value.size > 1 }) {
-                                                    val builder = StringBuilder()
-
-                                                    builder.appendln("tie breaker")
-                                                    it.values.flatten().forEach {
-                                                        builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-                                                    }
-                                                    logger.info(builder.toString())
-                                                }
-                                            }
-                                }
-
-                                it
-                            }
                             .firstOrNull()
 
                     if (target != null) {
