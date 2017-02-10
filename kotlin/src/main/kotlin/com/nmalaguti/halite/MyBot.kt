@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveBlackoutBot"
+val BOT_NAME = "MyShoveOldStyleBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -681,7 +681,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-                 blackoutCells.add(source)
+                blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -880,7 +880,7 @@ object MyBot {
                 }
 
         gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
+                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
                 .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -888,7 +888,7 @@ object MyBot {
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
-                            .filter { cellsToEnemyGrid[it] < cellsToEnemyGrid[loc] }
+                            .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
                             .filter {
                                 val nextSite = nextMap.getSite(it)
 
@@ -904,8 +904,8 @@ object MyBot {
                                 }
                             }
                             .sortedWith(compareBy(
-                                    { cellsToEnemyGrid[it] },
                                     { distanceToEnemyGrid[it] },
+                                    { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
