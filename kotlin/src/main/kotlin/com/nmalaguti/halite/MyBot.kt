@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveBetterBattleBot"
+val BOT_NAME = "MyShoveStrict64Bot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -723,12 +723,12 @@ object MyBot {
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
-                                        it.value.filterNot {
+                                        it.value.all {
                                             if (it.origin.site().strength != enemyDamageStrength[it])
                                                 enemyDamageStrength[it]!! > loc.site().strength ||
-                                                        it.origin.site().strength < 16
+                                                        it.origin.site().strength < 64
                                             else true
-                                        }.size < 2
+                                        }
                                     } ?: true
                                 }
                                 .filter {
