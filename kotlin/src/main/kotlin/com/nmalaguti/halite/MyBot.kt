@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveStrict64Bot"
+val BOT_NAME = "MyShoveStrict64MixBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -295,6 +295,33 @@ object MyBot {
 
         // nap
 
+        gameMap
+                .filter { it.isOuterBorder() }
+                .filter { it.site().isEnvironment() && it.site().strength > 0 }
+                .filter {
+                    it.neighbors()
+                            .any {
+                                (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
+                                        (it.site().isCombat() && it.neighbors()
+                                                .filter { it.site().isOtherPlayer() }
+                                                .any { it.site().owner !in connectedPlayers })
+                            }
+                }
+                .forEach {
+                    val myStrOverTer = playerStats[id]?.let {
+                        it.strength / it.territory.toDouble()
+                    } ?: 0.0
+                    val theirStrOverTers = it.neighbors()
+                            .filter { it.site().isOtherPlayer() }
+                            .map {
+                                playerStats[it.site().owner]?.let {
+                                    it.strength / it.territory.toDouble()
+                                } ?: 0.0
+                            }
+                            .max() ?: 0.0
+                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
+                }
+
         if (madeContact) {
             gameMap
                     .filter { it.isOuterBorder() }
@@ -396,7 +423,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, (numPlayers + 1))) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, numPlayers)) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
@@ -852,7 +879,7 @@ object MyBot {
                 }
 
         gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
+                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
                 .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -860,7 +887,7 @@ object MyBot {
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
-                            .filter { cellsToEnemyGrid[it] < cellsToEnemyGrid[loc] }
+                            .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
                             .filter {
                                 val nextSite = nextMap.getSite(it)
 
@@ -876,8 +903,8 @@ object MyBot {
                                 }
                             }
                             .sortedWith(compareBy(
-                                    { cellsToEnemyGrid[it] },
                                     { distanceToEnemyGrid[it] },
+                                    { cellsToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
@@ -939,13 +966,7 @@ object MyBot {
 
     fun Site.resource() = if (!this.isMine()) {
         if (this.production == 0 || (this.isEnvironment() && this.strength == 255)) 9999
-        else {
-//            val onBorder = this.isEnvironment() &&
-//                    this.strength > 0 &&
-//                    this.loc.neighbors().any { it.site().isCombat() || it.site().isOtherPlayer() }
-
-            (this.strength / (this.production + stillMax).toDouble()).toInt()/* / (if (onBorder) 2 else 1)*/
-        }
+        else (this.strength / (this.production + stillMax).toDouble()).toInt()
     }
     else 9999
 
