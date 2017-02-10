@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveStrict64MixBot"
+val BOT_NAME = "MyShoveCrossBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -295,33 +295,6 @@ object MyBot {
 
         // nap
 
-        gameMap
-                .filter { it.isOuterBorder() }
-                .filter { it.site().isEnvironment() && it.site().strength > 0 }
-                .filter {
-                    it.neighbors()
-                            .any {
-                                (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
-                                        (it.site().isCombat() && it.neighbors()
-                                                .filter { it.site().isOtherPlayer() }
-                                                .any { it.site().owner !in connectedPlayers })
-                            }
-                }
-                .forEach {
-                    val myStrOverTer = playerStats[id]?.let {
-                        it.strength / it.territory.toDouble()
-                    } ?: 0.0
-                    val theirStrOverTers = it.neighbors()
-                            .filter { it.site().isOtherPlayer() }
-                            .map {
-                                playerStats[it.site().owner]?.let {
-                                    it.strength / it.territory.toDouble()
-                                } ?: 0.0
-                            }
-                            .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
-                }
-
         if (madeContact) {
             gameMap
                     .filter { it.isOuterBorder() }
@@ -380,7 +353,7 @@ object MyBot {
                 .distinct()
                 .forEach { origin ->
                     origin.neighborsAndSelf()
-//                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
+                            .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                             .forEach { destination ->
                                 val movement = Movement(origin, destination)
                                 enemyDamageStrength[movement] = origin.site().strength
@@ -423,7 +396,7 @@ object MyBot {
 
             val dist = gameMap.getDistance(currLoc, loc)
 
-            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, numPlayers)) continue
+            if (dist > Math.min(gameMap.width, gameMap.height) / Math.max(4, (numPlayers + 1))) continue
 
             val currAvg = locToValue[currLoc] ?: minAvg
 
@@ -629,13 +602,13 @@ object MyBot {
 
                 var nextTarget = target.neighbors()
                         .filter { it != source && it.site().isMine() && it !in sources && it !in destinations }
-                        .sortedWith(compareBy({ it.site().strength }, { -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
+                        .sortedWith(compareBy({ -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
                         .firstOrNull()
 
                 if (nextTarget == null) {
                     nextTarget = target.neighbors()
                             .filter { it != source && it !in sources && it !in destinations }
-                            .sortedWith(compareBy({ it.site().strength }, { -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
+                            .sortedWith(compareBy({ -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
                             .firstOrNull()
                 }
 
@@ -750,12 +723,12 @@ object MyBot {
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
-                                        it.value.all {
+                                        it.value.filterNot {
                                             if (it.origin.site().strength != enemyDamageStrength[it])
                                                 enemyDamageStrength[it]!! > loc.site().strength ||
-                                                        it.origin.site().strength < 64
+                                                        it.origin.site().strength < 16
                                             else true
-                                        }
+                                        }.size < 2
                                     } ?: true
                                 }
                                 .filter {
@@ -879,7 +852,7 @@ object MyBot {
                 }
 
         gameMap
-                .filter { it.site().isMine() && it !in sources && it.site().strength == 255 }
+                .filter { it.site().isMine() && it !in sources && it.site().strength > strengthNeededGrid[it] }
                 .sortedWith(compareBy({ cellsToEnemyGrid[it] }, { distanceToEnemyGrid[it] }, { -it.site().strength }, { it.neighbors().filterNot { it.site().isMine() }.size }))
                 .forEach { loc ->
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
@@ -887,7 +860,7 @@ object MyBot {
                     val target = loc.neighbors()
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
-                            .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
+                            .filter { cellsToEnemyGrid[it] < cellsToEnemyGrid[loc] }
                             .filter {
                                 val nextSite = nextMap.getSite(it)
 
@@ -903,8 +876,8 @@ object MyBot {
                                 }
                             }
                             .sortedWith(compareBy(
-                                    { distanceToEnemyGrid[it] },
                                     { cellsToEnemyGrid[it] },
+                                    { distanceToEnemyGrid[it] },
                                     { if (it in directedGrid) directedGrid[it]!!.first else 0 },
                                     { if (madeContact) 0 else -it.site().production },
                                     { if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0 },
