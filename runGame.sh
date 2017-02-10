@@ -22,15 +22,15 @@ rm -f *.log* *.hlt
 # https://halite.io/game.php?replay=ar1483393715-2206445183.hlt
 # https://halite.io/game.php?replay=ar1484675430-4021084152.hlt
 
-./halite -d "40 40" -s 1242531708 \
-    "tournament/bots/available/focusbot/run.sh" \
-    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
-
-#./halite -d "40 40" -s 2762992480 \
+#./halite -d "40 40" -s 1242531708 \
+#    "tournament/bots/available/focusbot/run.sh" \
 #    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
-#    "tournament/bots/available/waittoattackbot/run.sh" \
-#    "tournament/bots/available/sharpparametermix2bot/run.sh" \
-#    "tournament/bots/available/krakenbot/run.sh" \
+
+./halite -d "40 40" -s 2762992480 \
+    "java -XX:+PrintGCDetails -Xloggc:gc.log -Xmx250m -jar kotlin/build/install/MyBot/MyBot.jar" \
+    "tournament/bots/available/waittoattackbot/run.sh" \
+    "tournament/bots/available/sharpparametermix2bot/run.sh" \
+    "tournament/bots/available/krakenbot/run.sh" \
 
 #./halite -d "30 30" -s 3901829081 \
 #    "tournament/bots/available/thugclassicanyduobot/run.sh" \
