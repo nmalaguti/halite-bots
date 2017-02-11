@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyShoveCrossBot"
+val BOT_NAME = "MyShoveCrossNotClaimBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -705,7 +705,7 @@ object MyBot {
                         loc.neighbors()
                                 .filter { it.site().isCombat() }
                                 .filter {
-                                    loc.site().strength > loc.site().production * 2 &&
+                                    loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
                                             it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH
                                 }
                                 .sortedWith(compareBy(
