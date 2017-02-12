@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyParameterMixBot"
+val BOT_NAME = "MyParameterMixWaitMoreBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -320,7 +320,7 @@ object MyBot {
                                 } ?: 0.0
                             }
                             .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 1.2) distanceToEnemyGrid[it] = 255
+                    if (madeContact || myStrOverTer < theirStrOverTers * 1.5) distanceToEnemyGrid[it] = 255
                 }
 
         if (madeContact) {
