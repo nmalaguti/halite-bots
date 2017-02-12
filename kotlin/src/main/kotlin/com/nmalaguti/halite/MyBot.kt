@@ -3,13 +3,12 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyParameterMixWaitMoreBot"
+val BOT_NAME = "MyDisallowedShoveBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
 val MINIMUM_STRENGTH = 15
 val MAXIMUM_STRENGTH = 256
-val DEBUG_TIE_BREAKERS = false
 
 object MyBot {
     lateinit var gameMap: GameMap
@@ -41,6 +40,7 @@ object MyBot {
     var idleStrength: Int = 0
     lateinit var targetDistanceGrid: Grid
     var connectedPlayers: Set<Int> = setOf()
+    lateinit var disallowedGrid: Grid
 
     data class Movement(val origin: Location, val destination: Location)
 
@@ -97,6 +97,8 @@ object MyBot {
         logger.info("id: $id")
 
         initialNumPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
+
+        useHotSpots = initialNumPlayers < 3
 
         if (useHotSpots) initHotSpots()
 
@@ -296,11 +298,13 @@ object MyBot {
 
         // nap
 
+        disallowedGrid = Grid("disallowedGrid") { 0 }
+
         gameMap
                 .filter { it.isOuterBorder() }
                 .filter { it.site().isEnvironment() && it.site().strength > 0 }
                 .filter {
-                    it.neighbors()
+                    it.allNeighborsWithin(2)
                             .any {
                                 (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
                                         (it.site().isCombat() && it.neighbors()
@@ -312,7 +316,7 @@ object MyBot {
                     val myStrOverTer = playerStats[id]?.let {
                         it.strength / it.territory.toDouble()
                     } ?: 0.0
-                    val theirStrOverTers = it.neighbors()
+                    val theirStrOverTers = it.allNeighborsWithin(2)
                             .filter { it.site().isOtherPlayer() }
                             .map {
                                 playerStats[it.site().owner]?.let {
@@ -320,7 +324,9 @@ object MyBot {
                                 } ?: 0.0
                             }
                             .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 1.5) distanceToEnemyGrid[it] = 255
+                    if (madeContact || myStrOverTer < theirStrOverTers * 2.5) {
+                        disallowedGrid[it] = 1
+                    }
                 }
 
         if (madeContact) {
@@ -328,7 +334,7 @@ object MyBot {
                     .filter { it.isOuterBorder() }
                     .filter { it.site().isEnvironment() && it.site().strength > 0 }
                     .filter {
-                        it.neighbors()
+                        it.allNeighborsWithin(2)
                                 .any {
                                     (it.site().isOtherPlayer() && it.site().owner !in connectedPlayers) ||
                                             (it.site().isCombat() && it.neighbors()
@@ -565,6 +571,8 @@ object MyBot {
                         source.site().isMine() &&
                         this !in sources && source !in sources &&
                         this !in destinations && source !in destinations &&
+                        source !in enemyDamageTargets &&
+                        this !in enemyDamageTargets &&
                         ((source.site().strength == 255 && this.site().strength < 255) ||
                                 this.site().strength + 15 < source.site().strength)
 
@@ -622,9 +630,49 @@ object MyBot {
             }
         }
 
-        fun finalizeMove(source: Location, target: Location, addToBattleBlackout: Boolean, preventSwaps: Boolean) {
-            if (target.swappable(source) &&
+        fun finalizeMove(source: Location, target: Location, addToBattleBlackout: Boolean, preventSwaps: Boolean, shove: Boolean) {
+            if (shove && target.site().isMine() &&
                     nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
+
+                var nextTarget = target.neighbors()
+                        .filter { disallowedGrid[it] != 1 }
+                        .filter { it != source && it.site().isMine() && it !in sources && it !in destinations }
+                        .sortedWith(compareBy({ it.site().strength }, { -cellsToEnemyGrid[it] }, { -cellsToBorderGrid[it] }))
+                        .firstOrNull()
+
+                if (nextTarget == null) {
+                    nextTarget = target.neighbors()
+                            .filter { disallowedGrid[it] != 1 }
+                            .filter { !it.site().isMine() && it !in destinations }
+                            .sortedWith(compareBy({ it.site().resource() }))
+                            .firstOrNull()
+                }
+
+                val move = moveTowards(source, target)
+
+                updateNextMap(move)
+
+                allMoves.add(move)
+
+                if (addToBattleBlackout) battleBlackout.add(source)
+                if (!madeContact) blackoutCells.add(source)
+
+                sources.put(source, move.dir)
+                destinations.add(target)
+
+                if (nextTarget == null) {
+                    logger.warning("target $target could not be shoved anymore.")
+                } else {
+                    finalizeMove(target, nextTarget, false, false, true)
+                }
+            } else if (!shove && target.swappable(source) &&
+                    nextMap.getSite(target).strength + source.site().strength >= MAXIMUM_STRENGTH) {
+
+                val move = moveTowards(source, target)
+                val moveFromDestination = lastTurnMoves[move.loc.move(move.dir)]
+                if (moveFromDestination != null && moveFromDestination.loc.move(moveFromDestination.dir) == move.loc) {
+                    return
+                }
 
                 enemyDamageTargets[source]?.forEach {
                     enemyDamageStrength[it] = enemyDamageStrength[it]!! - target.site().strength
@@ -674,7 +722,7 @@ object MyBot {
                 allMoves.add(move)
 
                 if (addToBattleBlackout) battleBlackout.add(source)
-                blackoutCells.add(source)
+                if (!madeContact) blackoutCells.add(source)
 
                 sources.put(source, move.dir)
                 destinations.add(target)
@@ -695,6 +743,7 @@ object MyBot {
 
                     if (loc.neighborsAndSelf().none { it in enemyDamageTargets }) {
                         loc.neighbors()
+                                .filter { disallowedGrid[it] != 1 }
                                 .filter { it.site().isCombat() }
                                 .filter {
                                     loc.site().strength > Math.max(loc.site().production * 2, MINIMUM_STRENGTH) &&
@@ -706,11 +755,12 @@ object MyBot {
                                 ))
                                 .firstOrNull()
                                 ?.let { target ->
-                                    finalizeMove(loc, target, false, false)
+                                    finalizeMove(loc, target, false, false, true)
                                 }
 
                     } else {
                         val target = loc.neighbors()
+                                .filter { disallowedGrid[it] != 1 }
                                 .filter { it !in battleBlackout }
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
@@ -723,7 +773,11 @@ object MyBot {
                                 }
                                 .filter {
                                     if (it != loc && it.nextSite().isMine())
-                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH || it.swappable(loc)
+                                        it.nextSite().strength + loc.site().strength < MAXIMUM_STRENGTH ||
+                                                it.swappable(loc) ||
+                                                (it.nextSite().strength + loc.site().strength >= MAXIMUM_STRENGTH &&
+                                                        it !in sources &&
+                                                        it !in destinations)
                                     else true
                                 }
                                 .sortedWith(compareBy(
@@ -752,7 +806,7 @@ object MyBot {
                                 .firstOrNull()
 
                         if (target != null) {
-                            finalizeMove(loc, target, true, false)
+                            finalizeMove(loc, target, true, false, true)
                         } else {
                             enemyDamageTargets[loc]?.forEach {
                                 enemyDamageStrength[it] = enemyDamageStrength[it]!! - loc.site().strength
@@ -769,6 +823,7 @@ object MyBot {
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
                     val target = loc.neighbors()
+                            .filter { disallowedGrid[it] != 1 }
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] < distanceToEnemyGrid[loc] }
@@ -797,42 +852,11 @@ object MyBot {
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }
                             ))
-                            .let {
-                                if (DEBUG_TIE_BREAKERS) {
-                                    it
-                                            .map {
-                                                it to listOf(
-                                                        distanceToEnemyGrid[it],
-                                                        if (it in directedGrid) directedGrid[it]!!.first else 0,
-                                                        if (madeContact) 0 else -it.site().production,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
-                                                        -it.site().overkill(),
-                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size
-                                                )
-                                            }
-                                            .groupBy { it.second }
-                                            .let {
-                                                if (it.any { it.value.size > 1 }) {
-                                                    val builder = StringBuilder()
-
-                                                    builder.appendln("tie breaker")
-                                                    it.values.flatten().forEach {
-                                                        builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-                                                    }
-                                                    logger.info(builder.toString())
-                                                }
-                                            }
-                                }
-
-                                it
-                            }
                             .firstOrNull()
 
                     if (target != null) {
                         if (target in blackoutCells && loc.site().strength < 255) logger.warning("Want to move $loc to $target but it is a blackout cell and source doesn't have 255 strength")
-                        finalizeMove(loc, target, false, true)
+                        finalizeMove(loc, target, false, true, false)
                     }
                 }
 
@@ -842,7 +866,8 @@ object MyBot {
                             nextMap.getSite(it).isEnvironment() &&
                             nextMap.getSite(it).strength > 0 &&
                             it !in battleBlackout &&
-                            it !in blackoutCells
+                            it !in blackoutCells &&
+                            disallowedGrid[it] != 1
                 }
                 .sortedWith(compareBy({ distanceToEnemyGrid[it] }, { -it.site().overkill() }))
                 .forEach { loc ->
@@ -864,7 +889,7 @@ object MyBot {
                             }
                             .firstOrNull()
                             ?.forEach {
-                                finalizeMove(it, loc, false, true)
+                                finalizeMove(it, loc, false, true, false)
                             }
                 }
 
@@ -875,6 +900,7 @@ object MyBot {
                     if (System.currentTimeMillis() - start > MAXIMUM_TIME) return
 
                     val target = loc.neighbors()
+                            .filter { disallowedGrid[it] != 1 }
                             .filter { it !in battleBlackout }
                             .filter { it !in blackoutCells || loc.site().strength == 255 }
                             .filter { distanceToEnemyGrid[it] <= distanceToEnemyGrid[loc] }
@@ -903,42 +929,11 @@ object MyBot {
                                     { -it.site().overkill() },
                                     { -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size }
                             ))
-                            .let {
-                                if (DEBUG_TIE_BREAKERS) {
-                                    it
-                                            .map {
-                                                it to listOf(
-                                                        distanceToEnemyGrid[it],
-                                                        if (it in directedGrid) directedGrid[it]!!.first else 0,
-                                                        if (madeContact) 0 else -it.site().production,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength / Math.max(1, it.site().production) else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) -it.site().production else 0,
-                                                        if (it.site().isEnvironment() && it.site().strength > 0) it.site().strength else 0,
-                                                        -it.site().overkill(),
-                                                        -it.neighbors().filterNot { nextMap.getSite(it).isMine() }.size
-                                                )
-                                            }
-                                            .groupBy { it.second }
-                                            .let {
-                                                if (it.any { it.value.size > 1 }) {
-                                                    val builder = StringBuilder()
-
-                                                    builder.appendln("tie breaker")
-                                                    it.values.flatten().forEach {
-                                                        builder.appendln("${it.first} [${it.first.site()}]: ${it.second.joinToString(", ")}")
-                                                    }
-                                                    logger.info(builder.toString())
-                                                }
-                                            }
-                                }
-
-                                it
-                            }
                             .firstOrNull()
 
                     if (target != null) {
                         if (target in blackoutCells && loc.site().strength < 255) logger.warning("Want to move $loc to $target but it is a blackout cell and source doesn't have 255 strength")
-                        finalizeMove(loc, target, false, true)
+                        finalizeMove(loc, target, false, true, false)
                     }
                 }
 
