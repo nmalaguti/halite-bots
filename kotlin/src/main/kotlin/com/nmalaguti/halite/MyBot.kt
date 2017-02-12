@@ -3,7 +3,7 @@ package com.nmalaguti.halite
 import java.util.*
 import kotlin.comparisons.compareBy
 
-val BOT_NAME = "MyDisallowedShoveBot"
+val BOT_NAME = "MyDisallowedShoveProdBot"
 val MAXIMUM_TIME = 940 // ms
 val MAXIMUM_INIT_TIME = 7000 // ms
 val PI4 = Math.PI / 4
@@ -97,8 +97,6 @@ object MyBot {
         logger.info("id: $id")
 
         initialNumPlayers = gameMap.groupBy { it.site().owner }.keys.filter { it != 0 }.size
-
-        useHotSpots = initialNumPlayers < 3
 
         if (useHotSpots) initHotSpots()
 
@@ -314,17 +312,17 @@ object MyBot {
                 }
                 .forEach {
                     val myStrOverTer = playerStats[id]?.let {
-                        it.strength / it.territory.toDouble()
+                        (it.strength + it.production) / it.territory.toDouble()
                     } ?: 0.0
                     val theirStrOverTers = it.allNeighborsWithin(2)
                             .filter { it.site().isOtherPlayer() }
                             .map {
                                 playerStats[it.site().owner]?.let {
-                                    it.strength / it.territory.toDouble()
+                                    (it.strength + it.production) / it.territory.toDouble()
                                 } ?: 0.0
                             }
                             .max() ?: 0.0
-                    if (madeContact || myStrOverTer < theirStrOverTers * 2.5) {
+                    if (madeContact || myStrOverTer < theirStrOverTers * 2) {
                         disallowedGrid[it] = 1
                     }
                 }
@@ -765,10 +763,12 @@ object MyBot {
                                 .filterNot { it.site().isEnvironment() && it.site().strength > 0 }
                                 .filter {
                                     enemyDamageTargets[it]?.groupBy { it.origin }?.all {
-                                        it.value.any {
-                                            it.origin.site().strength == enemyDamageStrength[it] ||
-                                                    enemyDamageStrength[it]!! > loc.site().strength
-                                        }
+                                        it.value.filterNot {
+                                            if (it.origin.site().strength != enemyDamageStrength[it])
+                                                enemyDamageStrength[it]!! > loc.site().strength ||
+                                                        it.origin.site().strength < 16
+                                            else true
+                                        }.size < 2
                                     } ?: true
                                 }
                                 .filter {
