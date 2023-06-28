@@ -1,4 +1,4 @@
-name: Halite Match
+name: Build Halite Bots
 
 on:
   push:
@@ -37,17 +37,17 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.bot }}bot
           tags: |
-            type=sha,prefix=${{ matrix.bot }}bot-sha-
-            type=raw,value=${{ matrix.bot }}bot-{{date 'YYYYMMDD-HHmmss'}}
+            type=sha
+            type=raw,value={{date 'YYYYMMDD-HHmmss'}}
       - uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
           java-version: '11'
       - name: Build with gradle
         working-directory: docker/${{ matrix.bot }}
-        run: ./gradlew installDist
+        run: ./gradlew installDist --no-daemon
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
