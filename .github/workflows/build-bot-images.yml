@@ -5,15 +5,12 @@ on:
     branches:
       - master
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   run-match:
     name: Run Match
     runs-on: ubuntu-22.04
     strategy:
+      fail-fast: false
       matrix:
         bot:
           - easybot
@@ -21,6 +18,11 @@ jobs:
           - hardbot
           - nightmarebot
           - mzotkiew
+          - erdman_v12
+          - erdman_v17
+          - erdman_v26
+          - djma
+          - shummie
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -38,14 +40,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.bot }}
+          images: ghcr.io/${{ github.repository }}/${{ matrix.bot }}
           tags: |
             type=raw,value={{date 'YYYYMMDD-HHmmss'}}
             type=sha
       - uses: extractions/setup-just@v1
       - name: Build
         working-directory: docker/${{ matrix.bot }}
-        run: just
+        run: if [[ -e justfile ]]; then just; fi
       - name: Build and push
         uses: docker/build-push-action@v4
         with:

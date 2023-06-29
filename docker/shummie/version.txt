@@ -1,0 +1,376 @@
+History
+--------
+Version 85 - 3 / 1592 - mu: , sigma: - February 12, 2017
+* Insignificant changes
+
+Version 84 - 130 / 1591 - mu: 42.79, sigma: 1.34 - February 12, 2017
+* Minor change to end game rush turn countdown
+* Turn old combat back on but at very high strength.
+
+Version 83 - 7 / 1591 - mu: 50.36, sigma: 0.89 - February 12, 2017
+* Allow breaking through to avoid end game rush
+
+Version 82 - 2 / 1591 - mu: 52.08, sigma: 1.04 - February 12, 2017
+* Attack earlier near end of game
+* Some cleanups. hopefully will speed up code.
+
+Version 81 - 5 / 1590 - mu: 51.28, sigma: 0.96 - February 12, 2017
+* Avoid accidental holes which would break NAP
+* Try to attack if we're not winning and under NAP
+
+Version 80 - 2 / 1590 - mu: 53.79, sigma: 0.74 - February 12, 2017
+* Testing out no breakthroughs
+* Tweak mark_unsafe
+
+Version 79 - 5 / 1590 - mu: 52.5, sigma: 0.83 - February 12, 2017
+* Minor bugfixes to stop swap
+* Maybe new combat is better... increase weight.
+
+Version 78 - 4 / 1590 - mu: 52.6, sigma: 0.72 - February 11, 2017
+* I've changed and unchanged so many things I've lost track. If this isn't better or as good as the last 10 versions I've screwed up badly.
+
+Version 77 - 7 / 1590 - mu: 50.86, sigma: 0.8 - February 11, 2017
+* Stop_swaps tweak again
+* revert gini global, seems to do poorly.
+
+Version 76 - 9 / 1590 - mu: 50.47, sigma: 0.92 - February 11, 2017
+* Scale Gini global parameter
+* remove parity (accidentally brought it back in)
+
+Version 75 - 6 / 1590 - mu: 52.5, sigma: 0.99 - February 11, 2017
+* Don't try fancy combat when ahead (in strength at least)
+
+Version 74 - 3 / 1590 - mu: 53.43, sigma: 0.82 - February 11, 2017
+* Bugfix - forgot to include a parameter
+
+Version 73 - 7 / 1590 - mu: 51.69, sigma: 1.08 - February 11, 2017
+* Turn off print maps!
+
+Version 72 - 1585 / 1590 - mu: 9.49, sigma: 3.09 - February 11, 2017
+* Bugfix
+* Hopefully squashed the buildup_multiplier bug as well.
+
+Version 71 - 1546 / 1590 - mu: 11.79, sigma: 1.25 - February 11, 2017
+* More minor fixes, stop swaps, last turn capture. more time checks
+
+Version 70 - 4 / 1589 - mu: 53.66, sigma: 0.77 - February 11, 2017
+* Minor tweaks, clean up, try to fix standstill games
+* Still haven't fixed last turn captures
+
+Version 69 - 3 / 1589 - mu: 53.91, sigma: 0.73 - February 11, 2017
+* Reduce max turn time slightly
+* Reduce combat radius
+* Fix non aggression pact that I broke in v68
+* Completely new combat. Try to reduce overkill. Note: safe to move needs to be fixed for v70
+
+Version 68 - 7 / 1589 - mu: 51.12, sigma: 0.68 - February 6, 2017
+* undo - Tweak dijkstra cost function to prefer squares with lower strength very slightly (I hope)
+
+Version 67 - 3 / 1551 - mu: 53.52, sigma: 0.7 - February 5, 2017
+* Fixed a bug where last_resort_strength_check was always moving WEST.
+* Fixed a bug in stop_swaps to allow larger strength squares to move towards target.
+* Some add'l sorting to mitigate variance in starting position
+* Breakthrough 1 square at a time and only if sufficiently away from a combat zone.
+* Move to nearest "neutral" square instead of border square.
+* Tweak dijkstra cost function to prefer squares with lower strength very slightly (I hope)
+* Attempt varying global multiplier by gini coefficient of map (prod/str)
+* Add add'l checks to stop isolated squares from moving (or not moving)
+
+Version 66 - 2 / 1545 - mu: 53.71, sigma: 0.7 - February 4, 2017
+* added a timethis decorator function
+* Lots of minor code cleanup
+* Removed far_target functionality
+* Enforce the neutrality pact
+* enemy_strength_map adds 0.001 so that we can check for enemy border when str = 0
+* reduce global weight significantly
+* Detect which enemies we are in combat with and breakthrough borders only for those enemies
+* Consolidated some flood-fill functions
+* Changed percentile cut off for get_production_moves to eliminate squares instead of moves.
+* Allow rapid growth up to 5 squares and for squares with very good values
+* Added an overkill_check to try to avoid movements that would increase our overkill damage taken
+* Added some helper functions to Square class. Not all are used in this version.
+* Removed parity enforcement
+
+Version 65 - 4 / 1534 - mu: 52.71, sigma: 0.67 - January 31, 2017
+* Try not to break borders when fighting an enemy already unless it's the one we're fighting (does this actually work?)
+* Tweak combat raduis & combat build up slightly
+* Increase timeout threshold.
+
+Version 64 - 4 / 1487 - mu: 52.48, sigma: 0.71 - January 30, 2017
+* v63 uploaded wrong version.
+* Allow rapid production early game, then transiton to normal buildup, then focus strength buildup during earlylate game
+* The above requires a lot of parameter tweaking...
+* Removed some buildup by combat strength
+* Remove a bug - don't enforce parity attacking a cell. was a failed experiment
+* Fixed a bug in get_moves_other. Squares were moving towards border, not combat zones
+
+Version 63 - 5 / 1485 - mu: 50.74, sigma: 0.69 - January 30, 2017
+* Calculate parity each turn
+* Added sorts to stabilize bot so that different positions don't affect outcome
+* Drastically simplify code for moving all other pieces
+* Revised swap code slightly to allow higher strength pieces to move to border
+
+Version 62 - 4 / 1479 - mu: 52.38, sigma: 0.69 - January 27, 2017
+* Don't run away from border when enemy_str[2] > 0
+* Added timeout code
+* minor speedup to dijkstra
+* fix bordermap bug calc
+* Use actual distance through owned instead of distance_map_no_decay through mid game
+* Don't allow using squares that will be moved into for production search
+
+Version 61 - 8 / 1437 - mu: 51.08, sigma: 0.68 - January 24, 2017
+* More combat tweaks
+* Add'l timeout tweaks for 50x50 maps
+* Fix the small map bug for real, i hope.
+
+Version 60 - 12 / 1427 - mu: 49.52, sigma: 0.69 - January 24, 2017
+* Multiple speed ups. should hopefully fix most timeout issues.
+* Fixed a minor bug occurring in very small maps.
+
+Version 59 - 8 / 1421 - mu: 50.65 , sigma: 0.69 - January 21, 2017
+* Fix a bug in attack cell that made it search for all cells.
+
+Version 58 - 6 / 1395 - mu: 50.68, sigma: 0.68 - January 20, 2017
+* Additional tweaks to combat to reduce overkill damage to self.
+
+Version 57 - 4 / 1386 - mu: 51.15, sigma: 0.7 - January 19, 2017
+* Lower production penalty for going out further.
+* Tweak combat code. Should be more effective at reducing overkill damage to self.
+
+Version 56 - 6 / 1382 - mu: 50.95, sigma: 0.77 - January 19, 2017
+* Search a couple squares out when attacking a cell (a bit wacky I think but seems to work) (V 56-1-1, not used)
+* Put some logic from newbot into old bot. Hybrid bot!
+
+Version 55 - 9 / 1376 - mu: 49.87, sigma: 0.73 - January 19, 2017
+* Temporary test to see how v44 bot does nowadays.
+
+Version 54 - 8 / 1373 - mu: 50.31, sigma: 0.68 - January 18, 2017
+* Bugfix
+
+Version 53 - 647 / 1372 - mu: 33.44, sigma: 1.55 - January 18, 2017
+* Don't do dijkstra movement for large distances
+
+Version 52 - 250 / 1372 - mu: 40.57, sigma: 1.89 - January 18, 2017
+* Don't attack enemy borders unless breaking through
+* Try to enforce parity movement a bit more
+
+Version 51 - 10 / 1371 - mu: 49.78, sigma: 0.69 - January 18, 2017
+* Significantly bump up cost to go to a combat square so that cells try to continue to capture less valuable squares when at borders.
+
+Version 50 - 10 / 1370 - mu: 50.32, sigma: 0.7 - January 17, 2017
+* Stole some add'l code from the v46 prior bots.
+* Combat radius code added to force more cells to attack
+* Reverted back to old strength collision code.
+* Added an early game phase for the first five squares for minor improvements.
+
+Version 49 - 14 / 1369 - mu: 47.89, sigma: 0.7 - January 16, 2017
+* Remove a missed print map option
+
+Version 48 - 1331 / 1367 - mu: 10.77, sigma: 1.09 - January 16, 2017
+* Completely rebuilt bot (twice). Go didn't work out very well.
+* Single phase bot with single heuristic that drives production vs combat
+* Cells beyond border provide value to border cells
+* Cells only look 1 out to attack. No teamups.
+* I expect this to perform poorly. Testing to see how it does.
+
+Version 47 - 5 / 1367 - mu: 50.67, sigma: 0.69 - January 11, 2017
+* Utilize new heuristic (similar to global search) for general search
+* Try to smooth out hanging around borders to lessen overkill
+* Expand production range search
+* Reduce combat range & combat bonus for moving squares
+
+Version 46 - 4 / 1338 - mu: 51, sigma: 0.68 - January 10, 2017
+* Rewrite global vs local heuristic with numpy functions to fix timeout issues
+* Only use dijkstra production travel on maps less than 45x45 due to timeout issues
+* Removed buildup across borders (should we add this back in?)
+
+Version 45 - 9 / 1324 - mu: 48.47, sigma: 0.7 - January 9, 2017
+* Rewrite strength collision code
+* Dijkstra pathfinding with production for internal movement
+* Enforce parity when attacking
+* Really fix the 10% overstrength thing.
+* New heuristic to determine if it's worth pursuing the global maximum
+
+Version 44 - 3 / 1320 - mu: 51.79, sigma: 0.68 - January 8, 2017
+* Don't overwrite attack moves
+
+Version 43 - 730 / 1310 - mu: 29.5, sigma: 0.83 - January 8, 2017
+* Remove the 10% production thing again
+* Allow buildup across all borders. let's see how this works
+* Minor tweaks
+
+Version 42 - 5 / 1310 - mu: 51.02, sigma: 0.67 - January 6, 2017
+* Don't save maps...
+
+Version 41 - 1302 / 1304 - mu: 6.95, sigma: 2.65 - January 6, 2017
+* Added a new function to build up strength if combat is expected soon. Hopefully will help in small map games
+* Allow attacking into neutral territory to avoid strength collision
+* Hold back expansion when production > 10% of next highest every other frame.
+
+Version 40 - 7 / 1304 - mu: 50.86, sigma: 0.72 - January 6, 2017
+* Fix a bug, didn't completely revert an experiment
+
+Version 39 - 12 / 1303 - mu: 48.74, sigma: 0.88 - January 6, 2017
+* Change production 0 cells to 0.1 from 1 for Dijkstra calculations
+* Give a bigger bonus to closer cells when calculating global max distance ^ 0.15 instead of 0.05
+* Allow cells to build up more before being used for attacking
+
+Version 38 - 4 / 1302 - mu: 52.3 , sigma: 0.69 - January 5, 2017
+* Testing out hunting for global max. This is not going to end well.
+
+Version 37 - 6 / 1292 - mu: 51.71, sigma: 0.67 - January 3, 2017
+* Partially Revert not expanding when production > 10%. Seems to cause pathing issues.
+
+Version 36 - 6 / 1268 - mu: 50.57, sigma: 0.77 - January 3, 2017
+* Don't try to expand when production is > 10% more than the next highest enemy. Instead, use the strength to attack.
+* Added code to try to expand towards the global maximum
+
+Version 35 - 5 / 1268 - mu: 51.84, sigma: 0.72 - January 3, 2017
+* Penalize capturing cells too far away. I expect this actually perform worse, but let's try it out.
+
+Version 34 - 6 / 1263 - mu: 51.24, sigma: 0.74 - January 3, 2017
+* Oops, i forgot to make sure I didn't break anything
+
+Version 33 - 1229 / 1263 - mu: 7.86, sigma: 1.78 - January 3, 2017
+* Try to fix a timeout error occuring on the largest of maps.
+
+Version 32 - 16 / 1263 - mu: 49.6, sigma: 1.2 - January 3, 2017
+* Tweaked combat logic to take controlled/enemy production squares into consideration (How much does this actually affect the bot?)
+* Allow the bot to break through to create additional attack lanes if it thinks it's strong enough
+
+Version 31 - 5 / 1263 - mu: 51.59 , sigma: 0.70 - January 3, 2017
+* Alter buildup parameters to vary based on distance from border & production size
+* Tweak the production evaluation heuristic & moved to separate function
+* Allow breaking through enemy borders if strength is overloaded
+* Slightly more selective in which border cells to attack
+
+Version 30 - 6 / 1260 - mu: 50.45, sigma: 0.68 - January 1, 2017
+* Moved most parameters to a function to allow changing (some do!) based on game state.
+* Tweaked some parameters for the above.
+* Rewrote collision code. Much simplier. added a last check function to catch some that weren't working
+
+Version 29 - 6 / 1251 - mu: 51.71, sigma: 0.68 - December 31, 2016
+* Removed all distance maps. They took too long to calculate. Do a back end check later to make sure i didn't break anything.
+* Hit a peak of 3! (2 but that's cheating since nmalaguti reuploaded)
+
+Version 28 - 17 / 1242 - mu: 48.55, sigma: 0.95 - December 31, 2016
+* Trying to reduce timeout errors on large maps. Main culprits are distance and recover maps.
+
+Version 27 - 31 / 1242 - mu: 46.33, sigma: 0.82 - December 30, 2016
+* Prioritize attacking to attempt to maximize overkill damage.
+* Fix pathing to border cells
+* Choose production cells to attack smartly.
+* Delay movement of early game cells if it's not productive
+* Have border squares move first
+* Try to fix strength collisions, but not completely.
+* Added a zero-strength move check
+
+Version 26 - 14 / 1242 - mu: 48.73, sigma: 0.68 - December 29, 2016
+* Completely rewrote the bot again.
+* Note, first diamond bot! Rank 14
+
+Version 25 - 42 / 1203 - mu: 45.46 , sigma: 0.68  - December 24, 2016
+* I should test my bot before submitting. Fixed some bugs from the prior version.
+
+Version 24 - 1136 / 1164 - mu: 10.05, sigma: 1.3 - December 24, 2016
+* Removed some calcs from dij calc. Let's see if this stops the timeout issues.
+
+Version 23 - 25 / 1164 - mu: 47.45, sigma: 0.73 - December 24, 2016
+* This is getting stupid. Removed is_owner_map, changed some recover_map_smooth stuff. I hope nothing breaks. I supposedly fixed a broken as well.
+
+Version 22 - 149 / 1162 - mu: 41.91, sigma: 1.2 - December 24, 2016
+* Tweak some more things. Is it the init Dijkstra's that's causing the problems??
+
+Version 21 - 100 / 1162 - mu: 43.86, sigma: 1.11 - December 24, 2016
+* Reduce recover map to 9 and remove recover_map_enemy_smooth to try to alleviate timeout errors
+
+Version 20 - 302 / 1162 - mu: 38.56, sigma: 1.5 - December 24, 2016
+* Fix time-out errors from updating distance_maps that are not currently being used. Need to fix this if we want to use them in the future.
+
+Version 19 - 197 / 1162 - mu: 39.57, sigma: 0.86 December 23, 2016
+* Incorporate Dijkstra's Algorithm for pathfinding
+* A lot more opportunities to take advantage of this going forward.
+
+Version 18 - 23 / 1162 - mu: 47.38, sigma: 0.73 - December 23, 2016
+* Minor tweaks to parameters which seem to perform slightly better in testing
+
+Version 17 - 21 / 1161 - December 22, 2016
+* Reduce recover_map range to 15. 50 was a bit excessive and resulting in timeouts.
+
+Version 16 - 166 / 1155 - December 22, 2016
+* Use recover_map instead of future_value_map
+* Try to optimize attack patterns by having squares depending on parity
+* Try to avoid taking cells that won't pay itself off (still need to fix for late game)
+* Some hacky logic to have border cells move to more valuable border cells if they aren't valuable enough to capture
+
+Version 15 - 20 / 1155 - December 20, 2016
+* Tried many many major tweaks but nothing works.
+* Rewrote the move_to_target function which seems to perform much better
+* Minor code clean up
+* Rewrote the find nearest border function
+
+Version 14 - 30 / 1137 - December 12, 2016
+* Change how far our the early game tries to look based on map size and player count
+* Slightly tweak the find_nearest_non_npc_enemy_direction function. There is some slowdown when we're winning but we don't want to timeout. How to fix?
+
+Version 13 - 43 / 983 - December 11, 2016
+* Rewrote early game recursion code. Now runs in constant time!
+* Some minor parameter tweaking.
+* Wrote, but not using, a new heuristic map
+
+Version 12 - 23 / 974 - December 10, 2016
+* Timeout error fix attempt 2, bugfix in move_to_target
+
+Version 11 - 663 / 955 - December 10, 2016
+* Timeout error fix attempt
+
+Version 10.0 - 611 / 955 - December 10, 2016
+* Added separate parameters for late game, along with initial values
+* Rewrote the move_to_target code significantly.
+* Tweaked earlygame to midgame trigger
+
+Version 9.0 - 78 / 955 - December 9, 2016
+* Added a separate early game heuristic
+* Changed the overstrength code to occur when attempting to move to a target.
+* Attempts to chain when using the move_to_target overstrength code.
+* Tweaks to parameters. This will take a lot more future work to enhance.
+
+Version 8.0 - 93 / 939 - December 7, 2016
+* Fix a timeout bug, hopefully... Spread was taking up too much time so limit how far we go
+
+Version 7.0 - 143 / 906 - December 7, 2016
+* MAJOR CODE REWRITE!
+* Complete code refactoring.
+  Square is a class that contains information on a square.
+  GameMap contains all functions related to the game
+* Utilize numpy for a lot of information storage. Adopt some clever tricks from Declan.
+* Complete overhaul of the AI Engine. Older version had each cell evaluate what the best move was and then have it greedily perform the move. A coordinator then tries to prevent pieces from clashing.
+  Now, instead of each square acting independently, a strategy AI looks at all available squares to capture, then tries to see what squares are available to capture that square. Once that is complete, then the individual square AI is allowed to make whatever move it deems best.
+  Right now, there is still a check at the end to consider whether or not there is going to be strength clashing. A future enhancement is to have the square decide if it should move into it then try to find an alternative path?
+* A lot of the heuristic functions can now be tweaked utilizing parameters. Adjusting these is a todo as right now they are selected completely judgementally and hopefully enough to beat the prior version's code.
+
+Version 6.0 - 62 / 853 - December 3, 2016
+* Applied heuristic function to attacking by using multiple pieces
+
+Version 5.0 - 65 / 853 - December 3, 2016
+* heuristic function changes:
+  Tries not to overvalue expanding into cells bordering enemy territory too much.
+  Don't try to capture territory which is already being taken over.
+
+Version 4.0 - 73 / 848 - December 3, 2016
+* move_to_target: old implementation might move into uncontrolled territory. Not good.
+  New implementation moves only though adjacent owned territory, if possible. If multiple routes exist, then it takes the direction with the lowest production.
+* consolidate_strength: Split into two subroutines. One which is the old multi-attacker into a cell, the other looks outwards to gather strength to attack a cell.
+
+Version 3.0 - 74 / 848 - December 3, 2016
+* Failed compilation - skip version
+
+Version 2.0 - 74 / 848 - December 2, 2016
+* Moved hlt file to single file.
+* consolidate_strength: Completely rewritten. Searches all border tiles and then sees if we can consolidate. Ranked by production strength, then sees if we can consolidate.
+* find_nearest_enemy_direction: Calculate ALL distances, and pick the shortest with lowest production if there is a tie. Otherwise, pick randomly.
+* heuristic: look at not just the cell but adjacent cells to determine the value of capturing the cell.
+* smallest strength cells move first.
+
+Version 1.0 - 136 / 828 - December 1, 2016
+* First attempt at something that's better than the basic tutorial bots

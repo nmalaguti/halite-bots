@@ -1,0 +1,6 @@
+default: build
+
+build:
+  cd HAL-lite; javac -d ./build *.java
+  cd HAL-lite/build; jar cvfe MyBot.jar MyBot *.class
+  mv HAL-lite/build/MyBot.jar .
