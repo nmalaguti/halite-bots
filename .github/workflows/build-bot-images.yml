@@ -16,10 +16,11 @@ jobs:
     strategy:
       matrix:
         bot:
-          - easy
-          - intermediate
-          - hard
-          - nightmare
+          - easybot
+          - intermediatebot
+          - hardbot
+          - nightmarebot
+          - mzotkiew
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
@@ -39,15 +40,12 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.bot }}bot
           tags: |
-            type=sha
             type=raw,value={{date 'YYYYMMDD-HHmmss'}}
-      - uses: actions/setup-java@v3
-        with:
-          distribution: 'temurin'
-          java-version: '11'
-      - name: Build with gradle
+            type=sha
+      - uses: extractions/setup-just@v1
+      - name: Build
         working-directory: docker/${{ matrix.bot }}
-        run: ./gradlew installDist --no-daemon
+        run: just
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
