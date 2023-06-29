@@ -38,7 +38,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.bot }}bot
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.bot }}
           tags: |
             type=raw,value={{date 'YYYYMMDD-HHmmss'}}
             type=sha
