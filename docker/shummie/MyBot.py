@@ -133,7 +133,7 @@ class Game:
         send_string(' '.join(str(square.x) + ' ' + str(square.y) + ' ' + str(translate_cardinal(square.move)) for square in move_list))
 
     def create_squares_list(self):
-        self.squares = np.empty((self.w, self.h), dtype=np.object)
+        self.squares = np.empty((self.w, self.h), dtype=object)
         for x in range(self.w):
             for y in range(self.h):
                 self.squares[x, y] = Square(self, x, y, self.production_map[x, y])
