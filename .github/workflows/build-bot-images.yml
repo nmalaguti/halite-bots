@@ -5,9 +5,12 @@ on:
     branches:
       - master
 
+env:
+  REGISTRY: ghcr.io
+
 jobs:
-  run-match:
-    name: Run Match
+  build-bots:
+    name: Build Bots
     runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
