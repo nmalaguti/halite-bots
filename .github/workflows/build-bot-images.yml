@@ -26,7 +26,7 @@ jobs:
           - erdman_v17
           - erdman_v26
           - djma
-          # - shummie  # currently broken due to numpy issues
+          - shummie  # currently broken due to numpy issues
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
