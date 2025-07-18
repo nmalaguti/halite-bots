@@ -93,7 +93,7 @@ namespace Halite
 
             SolutionSet solutionSet = new SolutionSet(5);
             int added = 0;
-            while (DateTime.Now.ToFileTimeUtc() - time < 25e7)
+            while (DateTime.Now.ToFileTimeUtc() - time < 5e7)
             {
                 added++;
                 solutionSet.addSolution(findNeighbor(solutionSet.getBest(), solutionSet.getAverageConflictTime()));
@@ -766,7 +766,7 @@ namespace Halite
 
             int ll = 0;
             double temperature = 3.0;
-            while(DateTime.Now.ToFileTimeUtc()-time<5e6)
+            while(DateTime.Now.ToFileTimeUtc()-time<5e5)
             {
                 temperature *= 0.999;
                 ll++;
